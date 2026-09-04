@@ -18,13 +18,6 @@ const FOLDER_ID = "1uXPiDOxSF2VWF20QQnnAmHXSxp6iaNdm";
 // menyimpan info "siapa yang posting" per user)
 const DEFAULT_USERNAME = "@feed";
 
-// ============================================
-// SUPABASE (untuk dashboard admin: live viewer,
-// lokasi kasar, statistik tontonan)
-// ============================================
-// Kunci ini "publishable/anon key" — memang didesain untuk dipakai di
-// browser (client-side), aman untuk ditaruh di source code publik.
-// Yang menjaga keamanan datanya adalah RLS + fungsi database, bukan
-// kerahasiaan key ini.
-const SUPABASE_URL = "https://anhjvkhsskurjjxhmegs.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_Y1xnBWKtlzSb1DGLkjCYFQ_g0diRFfC";
+// Set true kalau mau urutan video diacak setiap kali halaman dibuka.
+// Default false = urutan terbaru dulu (sesuai createdTime di Drive).
+const SHUFFLE_FEED = false;

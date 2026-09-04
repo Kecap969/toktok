@@ -4,8 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Feed</title>
-<link rel="preconnect" href="https://www.googleapis.com" crossorigin />
-<link rel="dns-prefetch" href="https://www.googleapis.com" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -16,17 +14,9 @@
 
   <div id="feed"></div>
 
-  <div id="loading" class="skeleton">
-    <div class="skeleton-meta">
-      <div class="shimmer skeleton-handle"></div>
-      <div class="shimmer skeleton-caption"></div>
-      <div class="shimmer skeleton-caption short"></div>
-    </div>
-    <div class="skeleton-rail">
-      <div class="shimmer skeleton-circle"></div>
-      <div class="shimmer skeleton-circle"></div>
-      <div class="shimmer skeleton-circle"></div>
-    </div>
+  <div id="loading" class="status">
+    <div class="spinner"></div>
+    <h2>Memuat video…</h2>
   </div>
 
   <div id="empty" class="status hidden">
@@ -42,7 +32,6 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

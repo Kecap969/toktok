@@ -20,117 +20,6 @@ const likedKey = (id) => `feed:liked:${id}`;
 // otomatis main dengan suara nyala, tanpa perlu tap ulang per video.
 let audioUnlocked = false;
 
-// ---------- Pengaturan infinite scroll ----------
-// Berapa video yang diambil dari Google Drive per "halaman".
-const PAGE_SIZE = 8;
-// TIDAK ADA preload otomatis: video hanya dimuat (dapat src) saat tombol
-// play-nya di-klik. Radius ini hanya dipakai untuk membebaskan memori
-// video yang sudah pernah diputar tapi sekarang sudah jauh dari posisi
-// scroll saat ini, supaya tidak menumpuk video ter-load selamanya.
-const KEEP_LOADED_RADIUS = 3;
-
-let nextPageToken = null;
-let isFetchingMore = false;
-let currentIndex = 0;
-let observer = null;
-
-// ---------- Tracking untuk dashboard admin (best-effort) ----------
-// Semua fungsi di bawah ini sengaja dibungkus try/catch dan tidak pernah
-// melempar error ke pemanggilnya: kalau Supabase/geo API gagal atau
-// offline, video tetap harus jalan normal seperti biasa.
-
-const sb = (typeof window !== "undefined" && window.supabase && SUPABASE_URL && !SUPABASE_URL.includes("TEMPEL"))
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : null;
-
-function getSessionId() {
-  const KEY = "feed:sessionId";
-  let id = localStorage.getItem(KEY);
-  if (!id) {
-    id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
-    localStorage.setItem(KEY, id);
-  }
-  return id;
-}
-const SESSION_ID = getSessionId();
-
-let geoInfo = { city: null, country: null, ip: null };
-const geoReady = (async () => {
-  try {
-    const cached = sessionStorage.getItem("feed:geo");
-    if (cached) {
-      geoInfo = JSON.parse(cached);
-      return;
-    }
-    const res = await fetch("https://ipwho.is/");
-    const data = await res.json();
-    if (data && data.success !== false) {
-      geoInfo = { city: data.city || null, country: data.country || null, ip: data.ip || null };
-      sessionStorage.setItem("feed:geo", JSON.stringify(geoInfo));
-    }
-  } catch (e) {
-    // Lokasi/IP bersifat opsional; diamkan kalau gagal.
-  }
-})();
-
-// Kapan sesi ini mulai menonton video yang sedang aktif sekarang (dipakai
-// admin dashboard untuk menghitung durasi tonton berjalan). Direset hanya
-// saat video yang ditonton berubah, bukan setiap heartbeat.
-let watchStartedAt = null;
-
-let currentWatching = null; // { id, name }
-
-async function upsertPresence() {
-  if (!sb || !currentWatching) return;
-  try {
-    await sb.from("feed_presence").upsert({
-      session_id: SESSION_ID,
-      city: geoInfo.city,
-      country: geoInfo.country,
-      ip: geoInfo.ip,
-      video_id: currentWatching.id,
-      video_name: currentWatching.name,
-      watch_started_at: watchStartedAt,
-      updated_at: new Date().toISOString(),
-    });
-  } catch (e) {
-    // best-effort, abaikan
-  }
-}
-
-async function logViewEvent(id, name) {
-  if (!sb) return;
-  try {
-    await sb.from("feed_view_events").insert({
-      session_id: SESSION_ID,
-      video_id: id,
-      video_name: name,
-      city: geoInfo.city,
-      country: geoInfo.country,
-      ip: geoInfo.ip,
-    });
-  } catch (e) {
-    // best-effort, abaikan
-  }
-}
-
-async function trackWatching(section) {
-  const id = section.dataset.fileId;
-  const name = section.dataset.fileName;
-  if (currentWatching && currentWatching.id === id) return;
-  currentWatching = { id, name };
-  watchStartedAt = new Date().toISOString(); // video berganti -> durasi mulai dari 0
-  await geoReady;
-  logViewEvent(id, name);
-  upsertPresence();
-}
-
-// Heartbeat: perbarui "terakhir aktif" walau video yang ditonton sama,
-// supaya dashboard admin tahu sesi ini masih aktif.
-setInterval(() => {
-  if (document.visibilityState === "visible") upsertPresence();
-}, 10000);
-
 function showStatus(which, detail) {
   loadingEl.classList.add("hidden");
   emptyEl.classList.add("hidden");
@@ -143,15 +32,14 @@ function showStatus(which, detail) {
   }
 }
 
-async function fetchVideoPage(pageToken) {
+async function fetchVideoList() {
   const params = new URLSearchParams({
     q: `'${FOLDER_ID}' in parents and mimeType contains 'video/' and trashed = false`,
-    fields: "nextPageToken, files(id,name,thumbnailLink)",
+    fields: "files(id,name)",
     orderBy: "createdTime desc",
-    pageSize: String(PAGE_SIZE),
+    pageSize: "100",
     key: API_KEY,
   });
-  if (pageToken) params.set("pageToken", pageToken);
   const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -159,11 +47,30 @@ async function fetchVideoPage(pageToken) {
     throw new Error(msg);
   }
   const data = await res.json();
-  return { files: data.files || [], nextPageToken: data.nextPageToken || null };
+  return data.files || [];
 }
 
 function videoSrc(fileId) {
   return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
+}
+
+function prettifyCaption(rawName) {
+  let base = (rawName || "").replace(/\.[^/.]+$/, "");
+  base = base.replace(/^(VID|IMG|MOV|MP4|REC)[-_]?/i, "");
+
+  let dateLabel = "";
+  const m = base.match(/(\d{4})(\d{2})(\d{2})[_-](\d{2})(\d{2})(\d{2})/);
+  if (m) {
+    const [full, y, mo, d, h, mi] = m;
+    dateLabel = `${d}/${mo}/${y} ${h}:${mi}`;
+    base = base.replace(full, "");
+  }
+
+  base = base.replace(/[_-]+/g, " ").trim();
+  if (/^\d+$/.test(base)) base = ""; // sisa cuma nomor urut, buang
+
+  if (base && dateLabel) return `${base} — ${dateLabel}`;
+  return base || dateLabel || "Video";
 }
 
 function flashCenterIcon(section, which) {
@@ -175,65 +82,24 @@ function flashCenterIcon(section, which) {
   icon.classList.add("show");
 }
 
+function flashHeart(section) {
+  const burst = section.querySelector(".heart-burst");
+  burst.classList.remove("show");
+  void burst.offsetWidth;
+  burst.classList.add("show");
+}
+
 function updateMuteButton(section, video) {
   const btn = section.querySelector(".mute-toggle");
   btn.innerHTML = video.muted ? ICONS.muted : ICONS.unmuted;
 }
 
-// eager=true -> video ini yang sedang/akan ditonton, prioritaskan full
-// buffer ("auto"). eager=false -> tetangga di sekitar, cukup siapkan
-// metadata dulu ("metadata") supaya tidak rebutan bandwidth dengan video
-// yang benar-benar sedang ditonton (terutama penting saat pertama buka
-// halaman, ketika beberapa video sekaligus masuk ke jendela preload).
-function assignSrc(section, eager = false) {
-  const video = section.querySelector("video");
-  if (video.dataset.loaded === "1") {
-    if (eager && video.preload !== "auto") {
-      video.preload = "auto";
-      video.load();
-    }
-    return;
-  }
-  video.src = videoSrc(section.dataset.fileId);
-  video.preload = eager ? "auto" : "metadata";
-  video.dataset.loaded = "1";
-}
-
-function releaseSrc(section) {
-  const video = section.querySelector("video");
-  if (video.dataset.loaded !== "1") return;
-  video.pause();
-  video.removeAttribute("src");
-  video.load(); // hentikan buffering & bebaskan memori/bandwidth
-  video.preload = "none";
-  delete video.dataset.loaded;
-  const fill = section.querySelector(".progress-fill");
-  if (fill) fill.style.width = "0%";
-  const spinner = section.querySelector(".buffer-label");
-  if (spinner) spinner.classList.remove("show");
-}
-
-// Lepas src video yang sudah pernah diputar tapi sekarang berada jauh
-// (di luar KEEP_LOADED_RADIUS) dari posisi scroll saat ini. Ini murni
-// pembersihan memori, BUKAN preload — video yang belum pernah di-klik
-// play tidak akan pernah dapat src lewat fungsi ini.
-function releaseFarVideos(centerIndex) {
-  const items = feedEl.children;
-  for (let i = 0; i < items.length; i++) {
-    const distance = Math.abs(i - centerIndex);
-    if (distance > KEEP_LOADED_RADIUS) {
-      releaseSrc(items[i]);
-    }
-  }
-}
-
 function buildItem(file) {
   const section = document.createElement("section");
   section.className = "video-item";
-  section.dataset.fileId = file.id;
-  section.dataset.fileName = (file.name || "").replace(/\.[^/.]+$/, "");
 
   const video = document.createElement("video");
+  video.src = videoSrc(file.id);
   video.loop = true;
   video.muted = true;
   video.playsInline = true;
@@ -241,49 +107,18 @@ function buildItem(file) {
   video.draggable = false;
   video.disablePictureInPicture = true;
   video.setAttribute("controlsList", "nodownload noremoteplayback nofullscreen");
-  if (file.thumbnailLink) {
-    // Drive biasanya kasih thumbnail kecil (mis. =s220); perbesar sedikit
-    // supaya tidak pecah di layar penuh.
-    video.poster = file.thumbnailLink.replace(/=s\d+$/, "=s1600");
-  }
   video.addEventListener("contextmenu", (e) => e.preventDefault());
   video.addEventListener("dragstart", (e) => e.preventDefault());
 
   const centerIcon = document.createElement("div");
   centerIcon.className = "center-icon";
 
-  // Tombol play utama: tampil terus selama video belum diputar / sedang
-  // pause. Ini satu-satunya cara video mulai dimuat & diputar pertama
-  // kali — tidak ada autoplay maupun preload otomatis saat scroll.
-  const playBtn = document.createElement("button");
-  playBtn.className = "play-overlay visible";
-  playBtn.innerHTML = ICONS.play;
-  playBtn.setAttribute("aria-label", "Putar video");
-  playBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    startPlayback(section, video);
-  });
-  video.addEventListener("play", () => playBtn.classList.remove("visible"));
-  video.addEventListener("pause", () => playBtn.classList.add("visible"));
-
-  const likeBurst = document.createElement("div");
-  likeBurst.className = "like-burst";
+  const heartBurst = document.createElement("div");
+  heartBurst.className = "heart-burst";
+  heartBurst.innerHTML = ICONS.heart;
 
   const spinner = document.createElement("div");
-  spinner.className = "buffer-label";
-  spinner.textContent = "Loading...";
-
-  const progressWrap = document.createElement("div");
-  progressWrap.className = "progress-wrap";
-  const progressFill = document.createElement("div");
-  progressFill.className = "progress-fill";
-  progressWrap.appendChild(progressFill);
-
-  video.addEventListener("timeupdate", () => {
-    if (video.duration) {
-      progressFill.style.width = `${(video.currentTime / video.duration) * 100}%`;
-    }
-  });
+  spinner.className = "buffer-spinner";
 
   video.addEventListener("waiting", () => spinner.classList.add("show"));
   video.addEventListener("playing", () => spinner.classList.remove("show"));
@@ -300,73 +135,77 @@ function buildItem(file) {
     updateMuteButton(section, video);
   });
 
-  let tapTimer = null;
-  const DOUBLE_TAP_MS = 260;
+  const progressTrack = document.createElement("div");
+  progressTrack.className = "progress-track";
+  const progressFill = document.createElement("div");
+  progressFill.className = "progress-fill";
+  progressTrack.appendChild(progressFill);
 
-  video.addEventListener("click", () => {
-    // Tap kedua yang datang cepat -> ini double-tap: batalkan aksi
-    // single-tap yang tertunda, lalu jalankan "like".
-    if (tapTimer) {
-      clearTimeout(tapTimer);
-      tapTimer = null;
-      audioUnlocked = true;
-      setLiked(true, { pulse: !liked, burst: true });
-      return;
+  video.addEventListener("timeupdate", () => {
+    if (video.duration) {
+      progressFill.style.width = `${(video.currentTime / video.duration) * 100}%`;
     }
-    // Tunda aksi single-tap sebentar; kalau tidak disusul tap kedua,
-    // baru dieksekusi sebagai play/pause + unmute.
-    tapTimer = setTimeout(() => {
-      tapTimer = null;
-      if (video.paused) {
-        startPlayback(section, video);
-        flashCenterIcon(section, "play");
-      } else {
-        audioUnlocked = true;
-        if (video.muted) {
-          video.muted = false;
-          updateMuteButton(section, video);
-        }
-        video.pause();
-        flashCenterIcon(section, "pause");
-      }
-    }, DOUBLE_TAP_MS);
   });
 
-  const meta = document.createElement("div");
-  meta.className = "meta";
-  const caption = (file.name || "").replace(/\.[^/.]+$/, "");
-  meta.innerHTML = `<p class="handle">${DEFAULT_USERNAME}</p><p class="caption">${caption}</p>`;
+  progressTrack.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!video.duration) return;
+    const rect = progressTrack.getBoundingClientRect();
+    const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+    video.currentTime = ratio * video.duration;
+  });
 
-  const rail = document.createElement("div");
-  rail.className = "rail";
-
-  let liked = localStorage.getItem(likedKey(file.id)) === "1";
+  const liked0 = localStorage.getItem(likedKey(file.id)) === "1";
   const likeBtn = document.createElement("button");
-  likeBtn.className = liked ? "liked" : "";
+  likeBtn.className = liked0 ? "liked" : "";
   likeBtn.innerHTML = `${ICONS.heart}<span>Suka</span>`;
 
-  function setLiked(next, { pulse = false, burst = false } = {}) {
-    liked = next;
-    likeBtn.classList.toggle("liked", liked);
-    localStorage.setItem(likedKey(file.id), liked ? "1" : "0");
-    if (pulse) {
-      likeBtn.classList.remove("like-pulse");
-      void likeBtn.offsetWidth;
-      likeBtn.classList.add("like-pulse");
-    }
-    if (burst) {
-      const heart = section.querySelector(".like-burst");
-      heart.innerHTML = ICONS.heart;
-      heart.classList.remove("show");
-      void heart.offsetWidth;
-      heart.classList.add("show");
-    }
+  function setLiked(next) {
+    likeBtn.classList.toggle("liked", next);
+    localStorage.setItem(likedKey(file.id), next ? "1" : "0");
   }
 
   likeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    setLiked(!liked, { pulse: true });
+    setLiked(!likeBtn.classList.contains("liked"));
   });
+
+  // Single tap = play/pause. Double tap (dalam 300ms) = like + animasi hati,
+  // membatalkan aksi single-tap yang sempat terjadwal.
+  video.addEventListener("click", () => {
+    const now = Date.now();
+    const delta = now - (video._lastTap || 0);
+    video._lastTap = now;
+
+    if (delta < 300) {
+      clearTimeout(video._tapTimer);
+      if (!likeBtn.classList.contains("liked")) setLiked(true);
+      flashHeart(section);
+      return;
+    }
+
+    video._tapTimer = setTimeout(() => {
+      audioUnlocked = true;
+      if (video.muted) {
+        video.muted = false;
+        updateMuteButton(section, video);
+      }
+      if (video.paused) {
+        video.play().catch(() => {});
+        flashCenterIcon(section, "play");
+      } else {
+        video.pause();
+        flashCenterIcon(section, "pause");
+      }
+    }, 260);
+  });
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.innerHTML = `<p class="handle">${DEFAULT_USERNAME}</p><p class="caption">${prettifyCaption(file.name)}</p>`;
+
+  const rail = document.createElement("div");
+  rail.className = "rail";
 
   const commentBtn = document.createElement("button");
   commentBtn.innerHTML = `${ICONS.comment}<span>Komentar</span>`;
@@ -385,22 +224,20 @@ function buildItem(file) {
   });
 
   rail.append(likeBtn, commentBtn, shareBtn);
-  section.append(video, centerIcon, playBtn, likeBurst, spinner, progressWrap, muteBtn, meta, rail);
+  section.append(video, centerIcon, heartBurst, spinner, muteBtn, progressTrack, meta, rail);
   return section;
 }
 
-// Dipanggil HANYA dari interaksi klik user (tombol play atau tap video),
-// tidak pernah otomatis dari scroll. Di sinilah src video baru dipasang
-// (baru mulai dimuat), sesuai permintaan: tanpa preload otomatis.
-function startPlayback(section, video) {
-  assignSrc(section, true);
-
-  audioUnlocked = true;
-  video.muted = false;
+function playVisible(video, section) {
+  // Kalau audio sudah "unlocked" dari interaksi sebelumnya, coba nyalakan
+  // suara otomatis untuk video baru ini juga.
+  if (audioUnlocked) video.muted = false;
   updateMuteButton(section, video);
 
+  if (video.preload === "none") video.preload = "auto";
+
   if (video.readyState < 3) {
-    section.querySelector(".buffer-label").classList.add("show");
+    section.querySelector(".buffer-spinner").classList.add("show");
   }
 
   video.play().catch(() => {
@@ -415,59 +252,42 @@ function startPlayback(section, video) {
   });
 }
 
-// Ambil halaman berikutnya dari Drive kalau posisi sekarang sudah dekat
-// dengan ujung daftar video yang sudah dimuat (infinite scroll).
-async function loadMoreIfNeeded() {
-  if (isFetchingMore || !nextPageToken) return;
-  const remaining = feedEl.children.length - 1 - currentIndex;
-  if (remaining > 2) return; // masih ada beberapa video lagi di depan, belum perlu
-
-  isFetchingMore = true;
-  try {
-    const { files, nextPageToken: token } = await fetchVideoPage(nextPageToken);
-    nextPageToken = token;
-    const fragment = document.createDocumentFragment();
-    files.forEach((f) => {
-      const section = buildItem(f);
-      fragment.appendChild(section);
-      observer.observe(section);
-    });
-    feedEl.appendChild(fragment);
-  } catch (err) {
-    // Gagal memuat halaman berikutnya tidak boleh mengganggu video yang
-    // sedang ditonton; cukup dicatat, video yang sudah ada tetap jalan.
-    console.error("Gagal memuat video berikutnya:", err);
-  } finally {
-    isFetchingMore = false;
+function preloadNext(section) {
+  const next = section.nextElementSibling;
+  if (!next) return;
+  const nextVideo = next.querySelector("video");
+  if (nextVideo && nextVideo.preload === "none") {
+    nextVideo.preload = "auto";
   }
 }
 
 function setupAutoplay() {
-  observer = new IntersectionObserver(
+  const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         const section = entry.target;
         const video = section.querySelector("video");
         if (!video) return;
-
-        if (entry.isIntersecting && entry.intersectionRatio > 0.05) {
-          currentIndex = Array.prototype.indexOf.call(feedEl.children, section);
-          releaseFarVideos(currentIndex);
-          loadMoreIfNeeded();
-          trackWatching(section);
-        }
-
-        // Tidak ada autoplay: saat video keluar dari layar, cukup pause.
-        // Video tetap menunggu tombol play di-klik lagi saat scroll balik
-        // (src tidak dilepas kecuali sudah jauh, lihat releaseFarVideos).
-        if (!entry.isIntersecting || entry.intersectionRatio <= 0.6) {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+          playVisible(video, section);
+          preloadNext(section);
+        } else {
           video.pause();
         }
       });
     },
-    { threshold: [0, 0.05, 0.6, 1] }
+    { threshold: [0, 0.6, 1] }
   );
   document.querySelectorAll(".video-item").forEach((el) => observer.observe(el));
+}
+
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 async function init() {
@@ -478,25 +298,13 @@ async function init() {
 
   showStatus("loading");
   try {
-    let files, token;
-    const cacheKey = `feed:page1:${FOLDER_ID}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      // Refresh dalam tab yang sama: langsung pakai daftar video yang sudah
-      // pernah diambil, tanpa nunggu folder-listing Drive lagi.
-      ({ files, nextPageToken: token } = JSON.parse(cached));
-    } else {
-      ({ files, nextPageToken: token } = await fetchVideoPage(null));
-      try {
-        sessionStorage.setItem(cacheKey, JSON.stringify({ files, nextPageToken: token }));
-      } catch (e) {
-        // sessionStorage penuh/nonaktif; lanjut tanpa cache.
-      }
-    }
-    nextPageToken = token;
+    let files = await fetchVideoList();
     if (files.length === 0) {
       showStatus("empty");
       return;
+    }
+    if (typeof SHUFFLE_FEED !== "undefined" && SHUFFLE_FEED) {
+      files = shuffleArray(files);
     }
     const fragment = document.createDocumentFragment();
     files.forEach((f) => fragment.appendChild(buildItem(f)));
