@@ -12,7 +12,7 @@ const API_KEY = "AIzaSyBxmHrrGOA_TseA3OtthWtXkjsda_vVtfQ";
 // "Anyone with the link" -> Viewer)
 // Cara ambil ID: buka folder di Drive, lihat URL-nya
 // https://drive.google.com/drive/folders/INI_ID_NYA
-const FOLDER_ID = "1uXPiDOxSF2VWF20QQnnAmHXSxp6iaNdm";
+const FOLDER_ID = "1KAo3iiv2dHyZPh8R4fVIbT1ei7b0lPY1";
 
 // Nama tampilan default untuk uploader (karena Drive publik tidak
 // menyimpan info "siapa yang posting" per user)
