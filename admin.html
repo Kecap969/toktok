@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin — Feed</title>
+<style>
+  :root {
+    --ink: #0e0f11;
+    --paper: #f6f5f1;
+    --accent: #ff5a36;
+    --accent-dim: rgba(255, 90, 54, 0.35);
+    --line: rgba(246, 245, 241, 0.14);
+    --card: #17181b;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ---------- Login ---------- */
+
+  #login-screen {
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .login-card h1 { font-size: 18px; margin: 0; }
+
+  .login-card .sub {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: rgba(246, 245, 241, 0.65);
+  }
+
+  .login-card input {
+    background: #0e0f11;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--paper);
+    font-size: 15px;
+  }
+
+  .login-card input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .login-card button {
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    color: #16110d;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .login-card button:active { transform: scale(0.98); }
+
+  .error { color: #ff8a7a; font-size: 13px; margin: 0; }
+
+  /* ---------- Dashboard shell ---------- */
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: rgba(14, 15, 17, 0.9);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .topbar h1 { font-size: 16px; margin: 0; }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .refresh-status { color: #3ddc84; font-size: 10px; }
+  .refresh-status.stale { color: rgba(246, 245, 241, 0.3); }
+
+  .ghost-btn {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ---------- Stat cards ---------- */
+
+  .stat-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .stat-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 11px; color: rgba(246, 245, 241, 0.6); }
+
+  /* ---------- Panels & lists ---------- */
+
+  .panel h2 {
+    font-size: 14px;
+    margin: 0 0 10px;
+    color: rgba(246, 245, 241, 0.85);
+  }
+
+  .list { display: flex; flex-direction: column; gap: 8px; }
+
+  .empty-note {
+    font-size: 13px;
+    color: rgba(246, 245, 241, 0.45);
+    margin: 0;
+  }
+
+  .row-item {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .row-title {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .row-sub { font-size: 12px; color: rgba(246, 245, 241, 0.55); }
+
+  .row-badge {
+    flex-shrink: 0;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+
+  .rank {
+    color: rgba(246, 245, 241, 0.4);
+    font-size: 12px;
+    font-weight: 700;
+    width: 20px;
+    flex-shrink: 0;
+  }
+
+  .row-with-rank { display: flex; align-items: center; gap: 10px; }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="screen">
+  <form id="login-form" class="login-card">
+    <h1>Admin Dashboard</h1>
+    <p class="sub">Masukkan password untuk melihat data pengguna.</p>
+    <input id="password-input" type="password" placeholder="Password" autocomplete="current-password" />
+    <button type="submit">Masuk</button>
+    <p id="login-error" class="error hidden">Password salah.</p>
+  </form>
+</div>
+
+<div id="dashboard-screen" class="screen hidden">
+  <header class="topbar">
+    <h1>Feed — Admin Dashboard</h1>
+    <div class="topbar-actions">
+      <span id="refresh-status" class="refresh-status">●</span>
+      <button id="logout-btn" class="ghost-btn">Keluar</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="stat-cards">
+      <div class="stat-card">
+        <span class="stat-value" id="stat-active">0</span>
+        <span class="stat-label">Sedang aktif</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="stat-total-views">0</span>
+        <span class="stat-label">Total tontonan</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="stat-countries">0</span>
+        <span class="stat-label">Negara terjangkau</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Sedang menonton sekarang</h2>
+      <div id="active-list" class="list">
+        <p class="empty-note">Belum ada yang aktif.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Video paling banyak ditonton</h2>
+      <div id="top-videos-list" class="list">
+        <p class="empty-note">Belum ada data.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Sebaran negara</h2>
+      <div id="countries-list" class="list">
+        <p class="empty-note">Belum ada data.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // Kredensial Supabase (publishable key — memang aman ditaruh di
+  // source code client-side; keamanan data dijaga oleh RLS + fungsi
+  // database, bukan oleh kerahasiaan key ini). Samakan dengan yang ada
+  // di config.js kalau suatu saat diganti.
+  const SUPABASE_URL = "https://anhjvkhsskurjjxhmegs.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_Y1xnBWKtlzSb1DGLkjCYFQ_g0diRFfC";
+
+  const loginScreen = document.getElementById("login-screen");
+  const dashboardScreen = document.getElementById("dashboard-screen");
+  const loginForm = document.getElementById("login-form");
+  const passwordInput = document.getElementById("password-input");
+  const loginError = document.getElementById("login-error");
+  const logoutBtn = document.getElementById("logout-btn");
+  const refreshStatus = document.getElementById("refresh-status");
+
+  const statActive = document.getElementById("stat-active");
+  const statTotalViews = document.getElementById("stat-total-views");
+  const statCountries = document.getElementById("stat-countries");
+  const activeList = document.getElementById("active-list");
+  const topVideosList = document.getElementById("top-videos-list");
+  const countriesList = document.getElementById("countries-list");
+
+  const REFRESH_MS = 5000;
+  const SESSION_KEY = "feed:admin:pw"; // hanya di sessionStorage tab ini, hilang saat tab ditutup
+
+  let pw = null;
+  let pollTimer = null;
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  function timeAgo(iso) {
+    const diff = Math.max(0, Date.now() - new Date(iso).getTime());
+    const s = Math.floor(diff / 1000);
+    if (s < 5) return "baru saja";
+    if (s < 60) return `${s} detik lalu`;
+    const m = Math.floor(s / 60);
+    return `${m} menit lalu`;
+  }
+
+  function locationLabel(city, country) {
+    if (city && country) return `${city}, ${country}`;
+    if (country) return country;
+    return "Lokasi tidak diketahui";
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[ch]));
+  }
+
+  function renderActiveViewers(viewers) {
+    if (!viewers.length) {
+      activeList.innerHTML = `<p class="empty-note">Belum ada yang aktif.</p>`;
+      return;
+    }
+    activeList.innerHTML = viewers
+      .map((v) => `
+        <div class="row-item">
+          <div class="row-main">
+            <span class="row-title">${escapeHtml(v.video_name || "(video tanpa nama)")}</span>
+            <span class="row-sub">${escapeHtml(locationLabel(v.city, v.country))}</span>
+          </div>
+          <span class="row-badge">${escapeHtml(timeAgo(v.updated_at))}</span>
+        </div>
+      `)
+      .join("");
+  }
+
+  function renderTopVideos(videos) {
+    if (!videos.length) {
+      topVideosList.innerHTML = `<p class="empty-note">Belum ada data.</p>`;
+      return;
+    }
+    topVideosList.innerHTML = videos
+      .map((v, i) => `
+        <div class="row-item row-with-rank">
+          <span class="rank">#${i + 1}</span>
+          <div class="row-main">
+            <span class="row-title">${escapeHtml(v.video_name || "(video tanpa nama)")}</span>
+          </div>
+          <span class="row-badge">${v.views} x</span>
+        </div>
+      `)
+      .join("");
+  }
+
+  function renderCountries(countries) {
+    if (!countries.length) {
+      countriesList.innerHTML = `<p class="empty-note">Belum ada data.</p>`;
+      return;
+    }
+    countriesList.innerHTML = countries
+      .map((c) => `
+        <div class="row-item">
+          <div class="row-main">
+            <span class="row-title">${escapeHtml(c.country || "Tidak diketahui")}</span>
+          </div>
+          <span class="row-badge">${c.viewers} viewer</span>
+        </div>
+      `)
+      .join("");
+  }
+
+  async function refreshDashboard() {
+    try {
+      const { data, error } = await sb.rpc("feed_dashboard_data", { pw });
+      if (error) throw error;
+
+      statActive.textContent = data.active_count ?? 0;
+      statTotalViews.textContent = data.total_views ?? 0;
+      statCountries.textContent = (data.countries || []).length;
+
+      renderActiveViewers(data.active_viewers || []);
+      renderTopVideos(data.top_videos || []);
+      renderCountries(data.countries || []);
+
+      refreshStatus.classList.remove("stale");
+    } catch (err) {
+      refreshStatus.classList.add("stale");
+      if (String(err.message || "").includes("unauthorized")) {
+        stopDashboard();
+        showLogin("Sesi berakhir, silakan masuk lagi.");
+      }
+    }
+  }
+
+  function startDashboard() {
+    loginScreen.classList.add("hidden");
+    dashboardScreen.classList.remove("hidden");
+    refreshDashboard();
+    pollTimer = setInterval(refreshDashboard, REFRESH_MS);
+  }
+
+  function stopDashboard() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    dashboardScreen.classList.add("hidden");
+  }
+
+  function showLogin(message) {
+    loginScreen.classList.remove("hidden");
+    if (message) {
+      loginError.textContent = message;
+      loginError.classList.remove("hidden");
+    }
+    passwordInput.value = "";
+    passwordInput.focus();
+  }
+
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    loginError.classList.add("hidden");
+    const candidate = passwordInput.value;
+    if (!candidate) return;
+
+    try {
+      const { data, error } = await sb.rpc("feed_admin_login", { pw: candidate });
+      if (error || data !== true) {
+        loginError.textContent = "Password salah.";
+        loginError.classList.remove("hidden");
+        return;
+      }
+      pw = candidate;
+      sessionStorage.setItem(SESSION_KEY, pw);
+      startDashboard();
+    } catch (err) {
+      loginError.textContent = "Gagal menghubungi server, coba lagi.";
+      loginError.classList.remove("hidden");
+    }
+  });
+
+  logoutBtn.addEventListener("click", () => {
+    pw = null;
+    sessionStorage.removeItem(SESSION_KEY);
+    stopDashboard();
+    showLogin();
+  });
+
+  // Kalau tab ini sudah pernah login sebelumnya (masih dalam sesi tab
+  // yang sama), langsung masuk tanpa minta password lagi.
+  (function init() {
+    const saved = sessionStorage.getItem(SESSION_KEY);
+    if (saved) {
+      pw = saved;
+      startDashboard();
+    }
+  })();
+</script>
+</body>
+</html>

@@ -33,6 +33,94 @@ let isFetchingMore = false;
 let currentIndex = 0;
 let observer = null;
 
+// ---------- Tracking untuk dashboard admin (best-effort) ----------
+// Semua fungsi di bawah ini sengaja dibungkus try/catch dan tidak pernah
+// melempar error ke pemanggilnya: kalau Supabase/geo API gagal atau
+// offline, video tetap harus jalan normal seperti biasa.
+
+const sb = (typeof window !== "undefined" && window.supabase && SUPABASE_URL && !SUPABASE_URL.includes("TEMPEL"))
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+function getSessionId() {
+  const KEY = "feed:sessionId";
+  let id = localStorage.getItem(KEY);
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+const SESSION_ID = getSessionId();
+
+let geoInfo = { city: null, country: null };
+const geoReady = (async () => {
+  try {
+    const cached = sessionStorage.getItem("feed:geo");
+    if (cached) {
+      geoInfo = JSON.parse(cached);
+      return;
+    }
+    const res = await fetch("https://ipwho.is/");
+    const data = await res.json();
+    if (data && data.success !== false) {
+      geoInfo = { city: data.city || null, country: data.country || null };
+      sessionStorage.setItem("feed:geo", JSON.stringify(geoInfo));
+    }
+  } catch (e) {
+    // Lokasi bersifat opsional; diamkan kalau gagal.
+  }
+})();
+
+let currentWatching = null; // { id, name }
+
+async function upsertPresence() {
+  if (!sb || !currentWatching) return;
+  try {
+    await sb.from("feed_presence").upsert({
+      session_id: SESSION_ID,
+      city: geoInfo.city,
+      country: geoInfo.country,
+      video_id: currentWatching.id,
+      video_name: currentWatching.name,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    // best-effort, abaikan
+  }
+}
+
+async function logViewEvent(id, name) {
+  if (!sb) return;
+  try {
+    await sb.from("feed_view_events").insert({
+      session_id: SESSION_ID,
+      video_id: id,
+      video_name: name,
+      city: geoInfo.city,
+      country: geoInfo.country,
+    });
+  } catch (e) {
+    // best-effort, abaikan
+  }
+}
+
+async function trackWatching(section) {
+  const id = section.dataset.fileId;
+  const name = section.dataset.fileName;
+  if (currentWatching && currentWatching.id === id) return;
+  currentWatching = { id, name };
+  await geoReady;
+  logViewEvent(id, name);
+  upsertPresence();
+}
+
+// Heartbeat: perbarui "terakhir aktif" walau video yang ditonton sama,
+// supaya dashboard admin tahu sesi ini masih aktif.
+setInterval(() => {
+  if (document.visibilityState === "visible") upsertPresence();
+}, 10000);
+
 function showStatus(which, detail) {
   loadingEl.classList.add("hidden");
   emptyEl.classList.add("hidden");
@@ -123,6 +211,7 @@ function buildItem(file) {
   const section = document.createElement("section");
   section.className = "video-item";
   section.dataset.fileId = file.id;
+  section.dataset.fileName = (file.name || "").replace(/\.[^/.]+$/, "");
 
   const video = document.createElement("video");
   video.loop = true;
@@ -326,6 +415,7 @@ function setupAutoplay() {
           currentIndex = Array.prototype.indexOf.call(feedEl.children, section);
           ensureWindow(currentIndex);
           loadMoreIfNeeded();
+          trackWatching(section);
         }
 
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {

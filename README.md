@@ -56,15 +56,56 @@ const FOLDER_ID = "1a2b3c...";     // dari langkah 1
   kalau sudah sampai tahap itu.
 - **API key tetap terlihat** di source code (wajar untuk API key client-side
   read-only), makanya restriction di langkah 2 itu wajib, bukan opsional.
-- Kalau folder berisi ribuan video, pertimbangkan pagination (`pageToken`)
-  alih-alih memuat semua sekaligus — versi ini memuat maksimal 100 video
-  per load.
+- Video dimuat bertahap (infinite scroll): 8 video per halaman dari Drive,
+  otomatis mengambil halaman berikutnya saat Anda mendekati ujung daftar.
+  Di sisi pemutaran, hanya video dalam radius 3 dari posisi aktif (maks. 7
+  video sekaligus) yang benar-benar diberi `src`/di-preload — video yang
+  sudah jauh terlewat otomatis "dilepas" agar tidak membebani memori/
+  bandwidth. Angka-angka ini bisa diubah lewat `PAGE_SIZE` dan
+  `PRELOAD_RADIUS` di awal `app.js`.
 
 ## Struktur file
 
 ```
-index.html   → markup halaman
-style.css    → tampilan (dark, full-bleed vertical feed)
-app.js       → fetch Drive API + render + autoplay saat scroll
-config.js    → API_KEY dan FOLDER_ID (satu-satunya file yang perlu diedit)
+index.html   → markup halaman feed
+style.css    → tampilan feed (dark, full-bleed vertical feed)
+app.js       → fetch Drive API + render + autoplay saat scroll + kirim data ke dashboard
+config.js    → API_KEY, FOLDER_ID, dan kredensial Supabase (satu-satunya file yang perlu diedit)
+admin.html   → dashboard admin (satu file, HTML+CSS+JS jadi satu)
 ```
+
+## 5. Dashboard admin
+
+Buka `admin.html` (mis. `https://USERNAME.github.io/nama-repo/admin.html`)
+dan masukkan password yang sudah Anda pilih. Dashboard menampilkan:
+
+- Jumlah pengguna yang sedang aktif menonton saat ini
+- Video apa yang sedang ditonton tiap pengguna, beserta lokasi kasar
+  (kota/negara, dari IP — bukan GPS)
+- Video yang paling banyak ditonton sepanjang waktu
+- Sebaran negara pengunjung
+
+**Cara kerja & batasannya:**
+- Setiap browser pengunjung punya "session ID" acak yang disimpan di
+  `localStorage`, dipakai untuk mencatat video apa yang sedang ditonton
+  dan mengirim "heartbeat" tiap 10 detik ke Supabase. Ini bukan akun
+  login — kalau pengunjung membuka di browser/incognito lain, dianggap
+  sesi baru.
+- Lokasi didapat dari IP publik pengunjung lewat layanan gratis
+  (ipwho.is) saat pertama buka halaman, jadi hanya seakurat kota/negara,
+  bukan alamat persis.
+- Password dashboard disimpan **ter-hash** di database (bukan plaintext
+  di kode), dan dicek lewat fungsi khusus di Supabase — bukan sekadar
+  gerbang tampilan. Tabel data pengguna terkunci penuh (RLS) dan hanya
+  bisa dibaca lewat fungsi itu setelah password benar.
+- Untuk mengganti password nanti, perlu dijalankan lewat SQL editor di
+  Supabase (bisa saya bantu kalau saatnya tiba).
+- Karena ini situs statis tanpa server, kunci Supabase yang dipakai di
+  `config.js` memang publik/terekspos di source code — ini normal untuk
+  "publishable key", dan keamanan datanya bergantung pada RLS + fungsi
+  database di atas, bukan pada menyembunyikan kunci ini.
+- `admin.html` sengaja dibuat satu file mandiri (CSS & JS sudah digabung
+  di dalamnya) supaya tidak perlu upload file terpisah — jadi ia punya
+  salinan sendiri `SUPABASE_URL`/`SUPABASE_ANON_KEY`, terpisah dari
+  `config.js`. Kalau nanti project Supabase diganti, dua tempat ini
+  perlu disamakan.
