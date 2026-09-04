@@ -43,9 +43,10 @@ async function fetchVideoList() {
 }
 
 function videoSrc(fileId) {
-  // Diproxy + di-cache lewat Supabase Edge Function "video-proxy",
-  // bukan langsung ke Google Drive.
-  return `${SUPABASE_FUNCTIONS_URL}/video-proxy?id=${encodeURIComponent(fileId)}`;
+  // Langsung ke Google Drive (bukan lewat proxy Supabase lagi), supaya
+  // streaming file besar & Range request (seek) ditangani server Google,
+  // bukan Edge Function yang bisa timeout di tengah streaming.
+  return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(GOOGLE_DRIVE_API_KEY)}`;
 }
 
 // Drive kasih thumbnail kecil (biasanya diakhiri =s220), kita minta ukuran
@@ -185,14 +186,7 @@ function buildItem(file) {
       const delay = retries === 0 ? 1500 : 3000; // backoff: 1.5s lalu 3s
       setTimeout(() => {
         video.load();
-        // Retry ini terjadi di luar user-gesture, jadi browser bisa menolak
-        // play() dengan suara. Kalau ditolak, jatuhkan ke muted supaya video
-        // tetap lanjut jalan (daripada macet diam-diam selamanya).
-        video.play().catch(() => {
-          video.muted = true;
-          updateMuteButton(section, video);
-          video.play().catch(() => {});
-        });
+        video.play().catch(() => {});
       }, delay);
       return;
     }
@@ -214,11 +208,7 @@ function buildItem(file) {
     errorMsg.classList.add("hidden");
     spinner.classList.add("show");
     video.load();
-    video.play().catch(() => {
-      video.muted = true;
-      updateMuteButton(section, video);
-      video.play().catch(() => {});
-    });
+    video.play().catch(() => {});
   });
 
   function startPlayback() {
@@ -230,10 +220,6 @@ function buildItem(file) {
     progressTrack.classList.remove("hidden");
     audioUnlocked = true;
     video.preload = "auto";
-    // Safari/iOS tidak selalu mendeteksi ubahan `preload` setelah src sudah
-    // di-assign dengan preload="none" — perlu load() eksplisit supaya
-    // buffering benar-benar mulai, kalau tidak video bisa "diam" saat ditap.
-    video.load();
     video.muted = false;
     updateMuteButton(section, video);
     spinner.classList.add("show");
@@ -394,6 +380,10 @@ function shuffleArray(arr) {
 async function init() {
   if (!SUPABASE_FUNCTIONS_URL || SUPABASE_FUNCTIONS_URL.includes("TEMPEL")) {
     showStatus("error", "SUPABASE_FUNCTIONS_URL belum diisi di config.js.");
+    return;
+  }
+  if (!GOOGLE_DRIVE_API_KEY || GOOGLE_DRIVE_API_KEY.includes("TEMPEL")) {
+    showStatus("error", "GOOGLE_DRIVE_API_KEY belum diisi di config.js (dipakai untuk streaming video langsung dari Drive).");
     return;
   }
 
