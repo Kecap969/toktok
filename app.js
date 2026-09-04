@@ -53,7 +53,7 @@ function getSessionId() {
 }
 const SESSION_ID = getSessionId();
 
-let geoInfo = { city: null, country: null };
+let geoInfo = { city: null, country: null, ip: null };
 const geoReady = (async () => {
   try {
     const cached = sessionStorage.getItem("feed:geo");
@@ -64,13 +64,18 @@ const geoReady = (async () => {
     const res = await fetch("https://ipwho.is/");
     const data = await res.json();
     if (data && data.success !== false) {
-      geoInfo = { city: data.city || null, country: data.country || null };
+      geoInfo = { city: data.city || null, country: data.country || null, ip: data.ip || null };
       sessionStorage.setItem("feed:geo", JSON.stringify(geoInfo));
     }
   } catch (e) {
-    // Lokasi bersifat opsional; diamkan kalau gagal.
+    // Lokasi/IP bersifat opsional; diamkan kalau gagal.
   }
 })();
+
+// Kapan sesi ini mulai menonton video yang sedang aktif sekarang (dipakai
+// admin dashboard untuk menghitung durasi tonton berjalan). Direset hanya
+// saat video yang ditonton berubah, bukan setiap heartbeat.
+let watchStartedAt = null;
 
 let currentWatching = null; // { id, name }
 
@@ -81,8 +86,10 @@ async function upsertPresence() {
       session_id: SESSION_ID,
       city: geoInfo.city,
       country: geoInfo.country,
+      ip: geoInfo.ip,
       video_id: currentWatching.id,
       video_name: currentWatching.name,
+      watch_started_at: watchStartedAt,
       updated_at: new Date().toISOString(),
     });
   } catch (e) {
@@ -99,6 +106,7 @@ async function logViewEvent(id, name) {
       video_name: name,
       city: geoInfo.city,
       country: geoInfo.country,
+      ip: geoInfo.ip,
     });
   } catch (e) {
     // best-effort, abaikan
@@ -110,6 +118,7 @@ async function trackWatching(section) {
   const name = section.dataset.fileName;
   if (currentWatching && currentWatching.id === id) return;
   currentWatching = { id, name };
+  watchStartedAt = new Date().toISOString(); // video berganti -> durasi mulai dari 0
   await geoReady;
   logViewEvent(id, name);
   upsertPresence();
@@ -136,7 +145,7 @@ function showStatus(which, detail) {
 async function fetchVideoPage(pageToken) {
   const params = new URLSearchParams({
     q: `'${FOLDER_ID}' in parents and mimeType contains 'video/' and trashed = false`,
-    fields: "nextPageToken, files(id,name)",
+    fields: "nextPageToken, files(id,name,thumbnailLink)",
     orderBy: "createdTime desc",
     pageSize: String(PAGE_SIZE),
     key: API_KEY,
@@ -233,6 +242,11 @@ function buildItem(file) {
   video.draggable = false;
   video.disablePictureInPicture = true;
   video.setAttribute("controlsList", "nodownload noremoteplayback nofullscreen");
+  if (file.thumbnailLink) {
+    // Drive biasanya kasih thumbnail kecil (mis. =s220); perbesar sedikit
+    // supaya tidak pecah di layar penuh.
+    video.poster = file.thumbnailLink.replace(/=s\d+$/, "=s1600");
+  }
   video.addEventListener("contextmenu", (e) => e.preventDefault());
   video.addEventListener("dragstart", (e) => e.preventDefault());
 
@@ -451,7 +465,21 @@ async function init() {
 
   showStatus("loading");
   try {
-    const { files, nextPageToken: token } = await fetchVideoPage(null);
+    let files, token;
+    const cacheKey = `feed:page1:${FOLDER_ID}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      // Refresh dalam tab yang sama: langsung pakai daftar video yang sudah
+      // pernah diambil, tanpa nunggu folder-listing Drive lagi.
+      ({ files, nextPageToken: token } = JSON.parse(cached));
+    } else {
+      ({ files, nextPageToken: token } = await fetchVideoPage(null));
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({ files, nextPageToken: token }));
+      } catch (e) {
+        // sessionStorage penuh/nonaktif; lanjut tanpa cache.
+      }
+    }
     nextPageToken = token;
     if (files.length === 0) {
       showStatus("empty");
