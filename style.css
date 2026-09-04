@@ -190,6 +190,41 @@ html, body {
   fill: none;
 }
 
+/* ---------- Tombol play utama (tampil sampai video di-klik) ---------- */
+
+.play-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: 76px;
+  height: 76px;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: rgba(14, 15, 17, 0.55);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.play-overlay svg {
+  width: 32px;
+  height: 32px;
+  fill: var(--paper);
+  margin-left: 3px; /* koreksi optik: segitiga play terlihat lebih ke kiri */
+}
+
+.play-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
 /* ---------- Ikon play/pause di tengah (muncul sekilas saat tap) ---------- */
 
 .center-icon {

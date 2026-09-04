@@ -20,13 +20,14 @@ const likedKey = (id) => `feed:liked:${id}`;
 // otomatis main dengan suara nyala, tanpa perlu tap ulang per video.
 let audioUnlocked = false;
 
-// ---------- Pengaturan infinite scroll & preload ----------
+// ---------- Pengaturan infinite scroll ----------
 // Berapa video yang diambil dari Google Drive per "halaman".
 const PAGE_SIZE = 8;
-// Jendela video yang boleh benar-benar dimuat (dapat src+preload) di
-// sekitar posisi video yang sedang aktif. Radius 3 = total 7 video
-// (3 sebelum + yang aktif + 3 sesudah) yang pernah punya src sekaligus.
-const PRELOAD_RADIUS = 3;
+// TIDAK ADA preload otomatis: video hanya dimuat (dapat src) saat tombol
+// play-nya di-klik. Radius ini hanya dipakai untuk membebaskan memori
+// video yang sudah pernah diputar tapi sekarang sudah jauh dari posisi
+// scroll saat ini, supaya tidak menumpuk video ter-load selamanya.
+const KEEP_LOADED_RADIUS = 3;
 
 let nextPageToken = null;
 let isFetchingMore = false;
@@ -212,18 +213,16 @@ function releaseSrc(section) {
   if (spinner) spinner.classList.remove("show");
 }
 
-// Pastikan hanya video dalam radius PRELOAD_RADIUS dari centerIndex yang
-// punya src (dimuat); di luar itu, src dilepas supaya tidak semua video
-// membebani jaringan/memori sekaligus.
-function ensureWindow(centerIndex) {
+// Lepas src video yang sudah pernah diputar tapi sekarang berada jauh
+// (di luar KEEP_LOADED_RADIUS) dari posisi scroll saat ini. Ini murni
+// pembersihan memori, BUKAN preload — video yang belum pernah di-klik
+// play tidak akan pernah dapat src lewat fungsi ini.
+function releaseFarVideos(centerIndex) {
   const items = feedEl.children;
   for (let i = 0; i < items.length; i++) {
-    const section = items[i];
     const distance = Math.abs(i - centerIndex);
-    if (distance <= PRELOAD_RADIUS) {
-      assignSrc(section, distance === 0);
-    } else {
-      releaseSrc(section);
+    if (distance > KEEP_LOADED_RADIUS) {
+      releaseSrc(items[i]);
     }
   }
 }
@@ -252,6 +251,20 @@ function buildItem(file) {
 
   const centerIcon = document.createElement("div");
   centerIcon.className = "center-icon";
+
+  // Tombol play utama: tampil terus selama video belum diputar / sedang
+  // pause. Ini satu-satunya cara video mulai dimuat & diputar pertama
+  // kali — tidak ada autoplay maupun preload otomatis saat scroll.
+  const playBtn = document.createElement("button");
+  playBtn.className = "play-overlay visible";
+  playBtn.innerHTML = ICONS.play;
+  playBtn.setAttribute("aria-label", "Putar video");
+  playBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startPlayback(section, video);
+  });
+  video.addEventListener("play", () => playBtn.classList.remove("visible"));
+  video.addEventListener("pause", () => playBtn.classList.add("visible"));
 
   const likeBurst = document.createElement("div");
   likeBurst.className = "like-burst";
@@ -304,15 +317,15 @@ function buildItem(file) {
     // baru dieksekusi sebagai play/pause + unmute.
     tapTimer = setTimeout(() => {
       tapTimer = null;
-      audioUnlocked = true;
-      if (video.muted) {
-        video.muted = false;
-        updateMuteButton(section, video);
-      }
       if (video.paused) {
-        video.play().catch(() => {});
+        startPlayback(section, video);
         flashCenterIcon(section, "play");
       } else {
+        audioUnlocked = true;
+        if (video.muted) {
+          video.muted = false;
+          updateMuteButton(section, video);
+        }
         video.pause();
         flashCenterIcon(section, "pause");
       }
@@ -372,19 +385,18 @@ function buildItem(file) {
   });
 
   rail.append(likeBtn, commentBtn, shareBtn);
-  section.append(video, centerIcon, likeBurst, spinner, progressWrap, muteBtn, meta, rail);
+  section.append(video, centerIcon, playBtn, likeBurst, spinner, progressWrap, muteBtn, meta, rail);
   return section;
 }
 
-function playVisible(video, section) {
-  // Jaga-jaga: kalau karena scroll cepat video ini belum sempat dimuat
-  // oleh ensureWindow, muat sekarang juga. Selalu eager (preload="auto")
-  // karena ini video yang benar-benar akan diputar.
+// Dipanggil HANYA dari interaksi klik user (tombol play atau tap video),
+// tidak pernah otomatis dari scroll. Di sinilah src video baru dipasang
+// (baru mulai dimuat), sesuai permintaan: tanpa preload otomatis.
+function startPlayback(section, video) {
   assignSrc(section, true);
 
-  // Kalau audio sudah "unlocked" dari interaksi sebelumnya, coba nyalakan
-  // suara otomatis untuk video baru ini juga.
-  if (audioUnlocked) video.muted = false;
+  audioUnlocked = true;
+  video.muted = false;
   updateMuteButton(section, video);
 
   if (video.readyState < 3) {
@@ -440,14 +452,15 @@ function setupAutoplay() {
 
         if (entry.isIntersecting && entry.intersectionRatio > 0.05) {
           currentIndex = Array.prototype.indexOf.call(feedEl.children, section);
-          ensureWindow(currentIndex);
+          releaseFarVideos(currentIndex);
           loadMoreIfNeeded();
           trackWatching(section);
         }
 
-        if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
-          playVisible(video, section);
-        } else {
+        // Tidak ada autoplay: saat video keluar dari layar, cukup pause.
+        // Video tetap menunggu tombol play di-klik lagi saat scroll balik
+        // (src tidak dilepas kecuali sudah jauh, lihat releaseFarVideos).
+        if (!entry.isIntersecting || entry.intersectionRatio <= 0.6) {
           video.pause();
         }
       });
@@ -490,7 +503,6 @@ async function init() {
     feedEl.appendChild(fragment);
     showStatus(null);
     setupAutoplay();
-    ensureWindow(0);
   } catch (err) {
     showStatus("error", err.message);
   }
