@@ -218,10 +218,13 @@ function buildItem(file) {
     muteBtn.classList.remove("hidden");
     progressTrack.classList.remove("hidden");
     audioUnlocked = true;
+    
     video.preload = "auto";
+    video.load();
     video.muted = false;
     updateMuteButton(section, video);
     spinner.classList.add("show");
+    
     video.play().catch(() => {
       // Kalau browser tetap menolak suara, jatuhkan ke muted supaya
       // video tetap jalan.
@@ -340,6 +343,10 @@ function buildItem(file) {
 
   rail.append(likeBtn, commentBtn, shareBtn);
   section.append(video, poster, playOverlay, centerIcon, heartBurst, spinner, errorMsg, muteBtn, progressTrack, meta, rail);
+  
+  // Ekspos fungsi startPlayback ke element section agar bisa diakses oleh observer
+  section.startPlayback = startPlayback;
+
   return section;
 }
 
@@ -355,8 +362,14 @@ function setupAutoplay() {
         const video = section.querySelector("video");
         if (!video) return;
         const started = section.dataset.started === "1";
+        
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
-          if (started) video.play().catch(() => {});
+          if (started) {
+            video.play().catch(() => {});
+          } else if (audioUnlocked && typeof section.startPlayback === "function") {
+            // Otomatis mainkan video baru jika user sebelumnya sudah pernah tap video
+            section.startPlayback();
+          }
         } else if (started) {
           video.pause();
         }
