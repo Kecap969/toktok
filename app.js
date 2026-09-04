@@ -170,11 +170,22 @@ function updateMuteButton(section, video) {
   btn.innerHTML = video.muted ? ICONS.muted : ICONS.unmuted;
 }
 
-function assignSrc(section) {
+// eager=true -> video ini yang sedang/akan ditonton, prioritaskan full
+// buffer ("auto"). eager=false -> tetangga di sekitar, cukup siapkan
+// metadata dulu ("metadata") supaya tidak rebutan bandwidth dengan video
+// yang benar-benar sedang ditonton (terutama penting saat pertama buka
+// halaman, ketika beberapa video sekaligus masuk ke jendela preload).
+function assignSrc(section, eager = false) {
   const video = section.querySelector("video");
-  if (video.dataset.loaded === "1") return;
+  if (video.dataset.loaded === "1") {
+    if (eager && video.preload !== "auto") {
+      video.preload = "auto";
+      video.load();
+    }
+    return;
+  }
   video.src = videoSrc(section.dataset.fileId);
-  video.preload = "auto";
+  video.preload = eager ? "auto" : "metadata";
   video.dataset.loaded = "1";
 }
 
@@ -199,8 +210,9 @@ function ensureWindow(centerIndex) {
   const items = feedEl.children;
   for (let i = 0; i < items.length; i++) {
     const section = items[i];
-    if (Math.abs(i - centerIndex) <= PRELOAD_RADIUS) {
-      assignSrc(section);
+    const distance = Math.abs(i - centerIndex);
+    if (distance <= PRELOAD_RADIUS) {
+      assignSrc(section, distance === 0);
     } else {
       releaseSrc(section);
     }
@@ -352,8 +364,9 @@ function buildItem(file) {
 
 function playVisible(video, section) {
   // Jaga-jaga: kalau karena scroll cepat video ini belum sempat dimuat
-  // oleh ensureWindow, muat sekarang juga.
-  if (video.dataset.loaded !== "1") assignSrc(section);
+  // oleh ensureWindow, muat sekarang juga. Selalu eager (preload="auto")
+  // karena ini video yang benar-benar akan diputar.
+  assignSrc(section, true);
 
   // Kalau audio sudah "unlocked" dari interaksi sebelumnya, coba nyalakan
   // suara otomatis untuk video baru ini juga.
