@@ -1,23 +1,24 @@
 // ============================================
-// ISI DUA VARIABEL INI SESUAI PUNYA ANDA
+// KONFIGURASI (via Supabase Edge Function proxy)
 // ============================================
+//
+// API key Google Drive TIDAK lagi disimpan di sini.
+// Video sekarang di-proxy + di-cache lewat Supabase, supaya:
+//  - API key Drive tidak ke-expose ke browser
+//  - Video di-cache di Supabase Storage (mengurangi 403 kuota Drive)
+//  - Range request (seek/buffer) lebih stabil, terutama di Safari/iOS
+//
+// Sisi server (Supabase Edge Function secrets) yang masih perlu diisi manual:
+//   GOOGLE_DRIVE_API_KEY   -> API key dari Google Cloud Console
+//   GOOGLE_DRIVE_FOLDER_ID -> ID folder Drive (dipakai oleh function video-list)
+// Cara set: dashboard Supabase -> Project Settings -> Edge Functions -> Secrets
+// atau CLI: supabase secrets set GOOGLE_DRIVE_API_KEY=xxx GOOGLE_DRIVE_FOLDER_ID=xxx
 
-// API Key dari Google Cloud Console (aktifkan "Google Drive API" dulu)
-// PENTING: batasi API key ini di Google Cloud Console -> Credentials ->
-// "Application restrictions" -> HTTP referrers -> isi domain GitHub Pages
-// Anda, contoh: username.github.io/*
-const API_KEY = "AIzaSyBxmHrrGOA_TseA3OtthWtXkjsda_vVtfQ";
+// URL project Supabase Anda (sudah diisi otomatis untuk project "FeedTok")
+const SUPABASE_FUNCTIONS_URL = "https://uslfcorrwzekvpyhzyvo.supabase.co/functions/v1";
 
-// ID folder Google Drive yang isinya video (folder harus di-share:
-// "Anyone with the link" -> Viewer)
-// Cara ambil ID: buka folder di Drive, lihat URL-nya
-// https://drive.google.com/drive/folders/INI_ID_NYA
-const FOLDER_ID = "1uXPiDOxSF2VWF20QQnnAmHXSxp6iaNdm";
-
-// Nama tampilan default untuk uploader (karena Drive publik tidak
-// menyimpan info "siapa yang posting" per user)
+// Nama tampilan default untuk uploader
 const DEFAULT_USERNAME = "@feed";
 
 // Set true kalau mau urutan video diacak setiap kali halaman dibuka.
-// Default false = urutan terbaru dulu (sesuai createdTime di Drive).
 const SHUFFLE_FEED = false;

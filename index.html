@@ -15,7 +15,12 @@
   <div id="feed"></div>
 
   <div id="loading" class="status">
-    <div class="spinner"></div>
+    <div class="spinner">
+      <div class="spinner-glow"></div>
+      <div class="spinner-ring spinner-ring--outer"></div>
+      <div class="spinner-ring spinner-ring--inner"></div>
+      <div class="spinner-dot"></div>
+    </div>
     <h2>Memuat video…</h2>
   </div>
 
@@ -27,7 +32,7 @@
   <div id="error" class="status hidden">
     <h2>Gagal memuat feed</h2>
     <p id="error-detail">Terjadi kesalahan.</p>
-    <p>Periksa <code>config.js</code>: API key, folder ID, dan pastikan folder di-share "Anyone with the link".</p>
+    <p>Periksa <code>config.js</code> (URL Supabase) dan pastikan secret <code>GOOGLE_DRIVE_API_KEY</code> / <code>GOOGLE_DRIVE_FOLDER_ID</code> sudah di-set di Edge Functions, serta folder Drive di-share "Anyone with the link".</p>
   </div>
 
 </div>

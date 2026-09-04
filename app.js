@@ -33,25 +33,19 @@ function showStatus(which, detail) {
 }
 
 async function fetchVideoList() {
-  const params = new URLSearchParams({
-    q: `'${FOLDER_ID}' in parents and mimeType contains 'video/' and trashed = false`,
-    fields: "files(id,name,thumbnailLink)",
-    orderBy: "createdTime desc",
-    pageSize: "100",
-    key: API_KEY,
-  });
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`);
+  const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/video-list`);
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const msg = body?.error?.message || `HTTP ${res.status}`;
+    const msg = data?.error || `HTTP ${res.status}`;
     throw new Error(msg);
   }
-  const data = await res.json();
   return data.files || [];
 }
 
 function videoSrc(fileId) {
-  return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
+  // Diproxy + di-cache lewat Supabase Edge Function "video-proxy",
+  // bukan langsung ke Google Drive.
+  return `${SUPABASE_FUNCTIONS_URL}/video-proxy?id=${encodeURIComponent(fileId)}`;
 }
 
 // Drive kasih thumbnail kecil (biasanya diakhiri =s220), kita minta ukuran
@@ -383,8 +377,8 @@ function shuffleArray(arr) {
 }
 
 async function init() {
-  if (!API_KEY || API_KEY.includes("TEMPEL") || !FOLDER_ID || FOLDER_ID.includes("TEMPEL")) {
-    showStatus("error", "API_KEY atau FOLDER_ID belum diisi di config.js.");
+  if (!SUPABASE_FUNCTIONS_URL || SUPABASE_FUNCTIONS_URL.includes("TEMPEL")) {
+    showStatus("error", "SUPABASE_FUNCTIONS_URL belum diisi di config.js.");
     return;
   }
 
