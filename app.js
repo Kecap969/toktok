@@ -35,7 +35,7 @@ function showStatus(which, detail) {
 async function fetchVideoList() {
   const params = new URLSearchParams({
     q: `'${FOLDER_ID}' in parents and mimeType contains 'video/' and trashed = false`,
-    fields: "files(id,name)",
+    fields: "files(id,name,thumbnailLink)",
     orderBy: "createdTime desc",
     pageSize: "100",
     key: API_KEY,
@@ -52,6 +52,13 @@ async function fetchVideoList() {
 
 function videoSrc(fileId) {
   return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
+}
+
+// Drive kasih thumbnail kecil (biasanya diakhiri =s220), kita minta ukuran
+// lebih besar biar gak pecah waktu ditampilkan full-bleed.
+function thumbnailUrl(link) {
+  if (!link) return "";
+  return link.replace(/=s\d+$/, "=s1280");
 }
 
 function prettifyCaption(rawName) {
@@ -110,6 +117,25 @@ function buildItem(file) {
   video.addEventListener("contextmenu", (e) => e.preventDefault());
   video.addEventListener("dragstart", (e) => e.preventDefault());
 
+  // Belum di-tap = belum boleh mulai buffering sama sekali.
+  section.dataset.started = "0";
+
+  const poster = document.createElement("img");
+  poster.className = "poster";
+  poster.loading = "lazy";
+  poster.decoding = "async";
+  poster.draggable = false;
+  poster.alt = "";
+  if (file.thumbnailLink) poster.src = thumbnailUrl(file.thumbnailLink);
+  else poster.classList.add("no-thumb"); // Drive belum sempat generate thumbnail
+  poster.addEventListener("dragstart", (e) => e.preventDefault());
+  poster.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  const playOverlay = document.createElement("button");
+  playOverlay.className = "play-overlay";
+  playOverlay.innerHTML = ICONS.play;
+  playOverlay.setAttribute("aria-label", "Putar video");
+
   const centerIcon = document.createElement("div");
   centerIcon.className = "center-icon";
 
@@ -120,13 +146,58 @@ function buildItem(file) {
   const spinner = document.createElement("div");
   spinner.className = "buffer-spinner";
 
+  const errorMsg = document.createElement("div");
+  errorMsg.className = "video-error hidden";
+  errorMsg.innerHTML = `<p>Video gagal dimuat.</p><button type="button" class="retry-btn">Coba lagi</button>`;
+
   video.addEventListener("waiting", () => spinner.classList.add("show"));
   video.addEventListener("playing", () => spinner.classList.remove("show"));
   video.addEventListener("canplay", () => spinner.classList.remove("show"));
-  video.addEventListener("error", () => spinner.classList.remove("show"));
+  video.addEventListener("error", () => {
+    spinner.classList.remove("show");
+    errorMsg.classList.remove("hidden");
+  });
+
+  errorMsg.querySelector(".retry-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    errorMsg.classList.add("hidden");
+    spinner.classList.add("show");
+    video.load();
+    video.play().catch(() => {});
+  });
+
+  function startPlayback() {
+    if (section.dataset.started === "1") return;
+    section.dataset.started = "1";
+    poster.classList.add("hidden");
+    playOverlay.classList.add("hidden");
+    muteBtn.classList.remove("hidden");
+    progressTrack.classList.remove("hidden");
+    audioUnlocked = true;
+    video.preload = "auto";
+    video.muted = false;
+    updateMuteButton(section, video);
+    spinner.classList.add("show");
+    video.play().catch(() => {
+      // Kalau browser tetap menolak suara, jatuhkan ke muted supaya
+      // video tetap jalan.
+      video.muted = true;
+      updateMuteButton(section, video);
+      video.play().catch(() => {});
+    });
+  }
+
+  playOverlay.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startPlayback();
+  });
+  poster.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startPlayback();
+  });
 
   const muteBtn = document.createElement("button");
-  muteBtn.className = "mute-toggle";
+  muteBtn.className = "mute-toggle hidden";
   muteBtn.innerHTML = ICONS.muted;
   muteBtn.addEventListener("click", (e) => {
     e.stopPropagation(); // supaya tidak sekaligus trigger play/pause
@@ -136,7 +207,7 @@ function buildItem(file) {
   });
 
   const progressTrack = document.createElement("div");
-  progressTrack.className = "progress-track";
+  progressTrack.className = "progress-track hidden";
   const progressFill = document.createElement("div");
   progressFill.className = "progress-fill";
   progressTrack.appendChild(progressFill);
@@ -224,43 +295,14 @@ function buildItem(file) {
   });
 
   rail.append(likeBtn, commentBtn, shareBtn);
-  section.append(video, centerIcon, heartBurst, spinner, muteBtn, progressTrack, meta, rail);
+  section.append(video, poster, playOverlay, centerIcon, heartBurst, spinner, errorMsg, muteBtn, progressTrack, meta, rail);
   return section;
 }
 
-function playVisible(video, section) {
-  // Kalau audio sudah "unlocked" dari interaksi sebelumnya, coba nyalakan
-  // suara otomatis untuk video baru ini juga.
-  if (audioUnlocked) video.muted = false;
-  updateMuteButton(section, video);
-
-  if (video.preload === "none") video.preload = "auto";
-
-  if (video.readyState < 3) {
-    section.querySelector(".buffer-spinner").classList.add("show");
-  }
-
-  video.play().catch(() => {
-    // Kalau browser tetap menolak autoplay bersuara (mis. belum ada
-    // interaksi sama sekali di halaman ini), jatuhkan ke muted supaya
-    // video tetap jalan, lalu tunggu tap pertama.
-    if (!video.muted) {
-      video.muted = true;
-      updateMuteButton(section, video);
-      video.play().catch(() => {});
-    }
-  });
-}
-
-function preloadNext(section) {
-  const next = section.nextElementSibling;
-  if (!next) return;
-  const nextVideo = next.querySelector("video");
-  if (nextVideo && nextVideo.preload === "none") {
-    nextVideo.preload = "auto";
-  }
-}
-
+// Video yang SUDAH pernah di-tap dijeda saat scroll keluar layar, dan
+// dilanjutkan otomatis saat scroll balik masuk. Video yang BELUM pernah
+// di-tap dibiarkan (tetap menampilkan poster + tombol play), tidak ada
+// auto-buffering sama sekali sebelum user mengklik.
 function setupAutoplay() {
   const observer = new IntersectionObserver(
     (entries) => {
@@ -268,10 +310,10 @@ function setupAutoplay() {
         const section = entry.target;
         const video = section.querySelector("video");
         if (!video) return;
+        const started = section.dataset.started === "1";
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
-          playVisible(video, section);
-          preloadNext(section);
-        } else {
+          if (started) video.play().catch(() => {});
+        } else if (started) {
           video.pause();
         }
       });
