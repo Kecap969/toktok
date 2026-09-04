@@ -87,8 +87,23 @@ function buildItem(file) {
   const centerIcon = document.createElement("div");
   centerIcon.className = "center-icon";
 
+  const likeBurst = document.createElement("div");
+  likeBurst.className = "like-burst";
+
   const spinner = document.createElement("div");
   spinner.className = "buffer-spinner";
+
+  const progressWrap = document.createElement("div");
+  progressWrap.className = "progress-wrap";
+  const progressFill = document.createElement("div");
+  progressFill.className = "progress-fill";
+  progressWrap.appendChild(progressFill);
+
+  video.addEventListener("timeupdate", () => {
+    if (video.duration) {
+      progressFill.style.width = `${(video.currentTime / video.duration) * 100}%`;
+    }
+  });
 
   video.addEventListener("waiting", () => spinner.classList.add("show"));
   video.addEventListener("playing", () => spinner.classList.remove("show"));
@@ -105,19 +120,36 @@ function buildItem(file) {
     updateMuteButton(section, video);
   });
 
+  let tapTimer = null;
+  const DOUBLE_TAP_MS = 260;
+
   video.addEventListener("click", () => {
-    audioUnlocked = true;
-    if (video.muted) {
-      video.muted = false;
-      updateMuteButton(section, video);
+    // Tap kedua yang datang cepat -> ini double-tap: batalkan aksi
+    // single-tap yang tertunda, lalu jalankan "like".
+    if (tapTimer) {
+      clearTimeout(tapTimer);
+      tapTimer = null;
+      audioUnlocked = true;
+      setLiked(true, { pulse: !liked, burst: true });
+      return;
     }
-    if (video.paused) {
-      video.play().catch(() => {});
-      flashCenterIcon(section, "play");
-    } else {
-      video.pause();
-      flashCenterIcon(section, "pause");
-    }
+    // Tunda aksi single-tap sebentar; kalau tidak disusul tap kedua,
+    // baru dieksekusi sebagai play/pause + unmute.
+    tapTimer = setTimeout(() => {
+      tapTimer = null;
+      audioUnlocked = true;
+      if (video.muted) {
+        video.muted = false;
+        updateMuteButton(section, video);
+      }
+      if (video.paused) {
+        video.play().catch(() => {});
+        flashCenterIcon(section, "play");
+      } else {
+        video.pause();
+        flashCenterIcon(section, "pause");
+      }
+    }, DOUBLE_TAP_MS);
   });
 
   const meta = document.createElement("div");
@@ -128,14 +160,32 @@ function buildItem(file) {
   const rail = document.createElement("div");
   rail.className = "rail";
 
-  const liked = localStorage.getItem(likedKey(file.id)) === "1";
+  let liked = localStorage.getItem(likedKey(file.id)) === "1";
   const likeBtn = document.createElement("button");
   likeBtn.className = liked ? "liked" : "";
   likeBtn.innerHTML = `${ICONS.heart}<span>Suka</span>`;
+
+  function setLiked(next, { pulse = false, burst = false } = {}) {
+    liked = next;
+    likeBtn.classList.toggle("liked", liked);
+    localStorage.setItem(likedKey(file.id), liked ? "1" : "0");
+    if (pulse) {
+      likeBtn.classList.remove("like-pulse");
+      void likeBtn.offsetWidth;
+      likeBtn.classList.add("like-pulse");
+    }
+    if (burst) {
+      const heart = section.querySelector(".like-burst");
+      heart.innerHTML = ICONS.heart;
+      heart.classList.remove("show");
+      void heart.offsetWidth;
+      heart.classList.add("show");
+    }
+  }
+
   likeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    const now = likeBtn.classList.toggle("liked");
-    localStorage.setItem(likedKey(file.id), now ? "1" : "0");
+    setLiked(!liked, { pulse: true });
   });
 
   const commentBtn = document.createElement("button");
@@ -155,7 +205,7 @@ function buildItem(file) {
   });
 
   rail.append(likeBtn, commentBtn, shareBtn);
-  section.append(video, centerIcon, spinner, muteBtn, meta, rail);
+  section.append(video, centerIcon, likeBurst, spinner, progressWrap, muteBtn, meta, rail);
   return section;
 }
 
