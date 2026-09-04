@@ -100,7 +100,7 @@ function releaseSrc(section) {
   delete video.dataset.loaded;
   const fill = section.querySelector(".progress-fill");
   if (fill) fill.style.width = "0%";
-  const spinner = section.querySelector(".buffer-spinner");
+  const spinner = section.querySelector(".buffer-label");
   if (spinner) spinner.classList.remove("show");
 }
 
@@ -142,7 +142,8 @@ function buildItem(file) {
   likeBurst.className = "like-burst";
 
   const spinner = document.createElement("div");
-  spinner.className = "buffer-spinner";
+  spinner.className = "buffer-label";
+  spinner.textContent = "Loading...";
 
   const progressWrap = document.createElement("div");
   progressWrap.className = "progress-wrap";
@@ -271,7 +272,7 @@ function playVisible(video, section) {
   updateMuteButton(section, video);
 
   if (video.readyState < 3) {
-    section.querySelector(".buffer-spinner").classList.add("show");
+    section.querySelector(".buffer-label").classList.add("show");
   }
 
   video.play().catch(() => {
