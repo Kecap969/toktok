@@ -87,9 +87,13 @@ function buildItem(file) {
   const centerIcon = document.createElement("div");
   centerIcon.className = "center-icon";
 
-  const watermark = document.createElement("div");
-  watermark.className = "watermark";
-  watermark.textContent = DEFAULT_USERNAME;
+  const spinner = document.createElement("div");
+  spinner.className = "buffer-spinner";
+
+  video.addEventListener("waiting", () => spinner.classList.add("show"));
+  video.addEventListener("playing", () => spinner.classList.remove("show"));
+  video.addEventListener("canplay", () => spinner.classList.remove("show"));
+  video.addEventListener("error", () => spinner.classList.remove("show"));
 
   const muteBtn = document.createElement("button");
   muteBtn.className = "mute-toggle";
@@ -151,7 +155,7 @@ function buildItem(file) {
   });
 
   rail.append(likeBtn, commentBtn, shareBtn);
-  section.append(video, centerIcon, watermark, muteBtn, meta, rail);
+  section.append(video, centerIcon, spinner, muteBtn, meta, rail);
   return section;
 }
 
@@ -162,6 +166,10 @@ function playVisible(video, section) {
   updateMuteButton(section, video);
 
   if (video.preload === "none") video.preload = "auto";
+
+  if (video.readyState < 3) {
+    section.querySelector(".buffer-spinner").classList.add("show");
+  }
 
   video.play().catch(() => {
     // Kalau browser tetap menolak autoplay bersuara (mis. belum ada
