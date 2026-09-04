@@ -78,9 +78,18 @@ function buildItem(file) {
   video.muted = true;
   video.playsInline = true;
   video.preload = "none";
+  video.draggable = false;
+  video.disablePictureInPicture = true;
+  video.setAttribute("controlsList", "nodownload noremoteplayback nofullscreen");
+  video.addEventListener("contextmenu", (e) => e.preventDefault());
+  video.addEventListener("dragstart", (e) => e.preventDefault());
 
   const centerIcon = document.createElement("div");
   centerIcon.className = "center-icon";
+
+  const watermark = document.createElement("div");
+  watermark.className = "watermark";
+  watermark.textContent = DEFAULT_USERNAME;
 
   const muteBtn = document.createElement("button");
   muteBtn.className = "mute-toggle";
@@ -142,7 +151,7 @@ function buildItem(file) {
   });
 
   rail.append(likeBtn, commentBtn, shareBtn);
-  section.append(video, centerIcon, muteBtn, meta, rail);
+  section.append(video, centerIcon, watermark, muteBtn, meta, rail);
   return section;
 }
 
@@ -166,6 +175,15 @@ function playVisible(video, section) {
   });
 }
 
+function preloadNext(section) {
+  const next = section.nextElementSibling;
+  if (!next) return;
+  const nextVideo = next.querySelector("video");
+  if (nextVideo && nextVideo.preload === "none") {
+    nextVideo.preload = "auto";
+  }
+}
+
 function setupAutoplay() {
   const observer = new IntersectionObserver(
     (entries) => {
@@ -175,6 +193,7 @@ function setupAutoplay() {
         if (!video) return;
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
           playVisible(video, section);
+          preloadNext(section);
         } else {
           video.pause();
         }
