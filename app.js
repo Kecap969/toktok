@@ -20,6 +20,19 @@ const likedKey = (id) => `feed:liked:${id}`;
 // otomatis main dengan suara nyala, tanpa perlu tap ulang per video.
 let audioUnlocked = false;
 
+// ---------- Pengaturan infinite scroll & preload ----------
+// Berapa video yang diambil dari Google Drive per "halaman".
+const PAGE_SIZE = 8;
+// Jendela video yang boleh benar-benar dimuat (dapat src+preload) di
+// sekitar posisi video yang sedang aktif. Radius 3 = total 7 video
+// (3 sebelum + yang aktif + 3 sesudah) yang pernah punya src sekaligus.
+const PRELOAD_RADIUS = 3;
+
+let nextPageToken = null;
+let isFetchingMore = false;
+let currentIndex = 0;
+let observer = null;
+
 function showStatus(which, detail) {
   loadingEl.classList.add("hidden");
   emptyEl.classList.add("hidden");
@@ -32,14 +45,15 @@ function showStatus(which, detail) {
   }
 }
 
-async function fetchVideoList() {
+async function fetchVideoPage(pageToken) {
   const params = new URLSearchParams({
     q: `'${FOLDER_ID}' in parents and mimeType contains 'video/' and trashed = false`,
-    fields: "files(id,name)",
+    fields: "nextPageToken, files(id,name)",
     orderBy: "createdTime desc",
-    pageSize: "100",
+    pageSize: String(PAGE_SIZE),
     key: API_KEY,
   });
+  if (pageToken) params.set("pageToken", pageToken);
   const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -47,7 +61,7 @@ async function fetchVideoList() {
     throw new Error(msg);
   }
   const data = await res.json();
-  return data.files || [];
+  return { files: data.files || [], nextPageToken: data.nextPageToken || null };
 }
 
 function videoSrc(fileId) {
@@ -68,12 +82,49 @@ function updateMuteButton(section, video) {
   btn.innerHTML = video.muted ? ICONS.muted : ICONS.unmuted;
 }
 
+function assignSrc(section) {
+  const video = section.querySelector("video");
+  if (video.dataset.loaded === "1") return;
+  video.src = videoSrc(section.dataset.fileId);
+  video.preload = "auto";
+  video.dataset.loaded = "1";
+}
+
+function releaseSrc(section) {
+  const video = section.querySelector("video");
+  if (video.dataset.loaded !== "1") return;
+  video.pause();
+  video.removeAttribute("src");
+  video.load(); // hentikan buffering & bebaskan memori/bandwidth
+  video.preload = "none";
+  delete video.dataset.loaded;
+  const fill = section.querySelector(".progress-fill");
+  if (fill) fill.style.width = "0%";
+  const spinner = section.querySelector(".buffer-spinner");
+  if (spinner) spinner.classList.remove("show");
+}
+
+// Pastikan hanya video dalam radius PRELOAD_RADIUS dari centerIndex yang
+// punya src (dimuat); di luar itu, src dilepas supaya tidak semua video
+// membebani jaringan/memori sekaligus.
+function ensureWindow(centerIndex) {
+  const items = feedEl.children;
+  for (let i = 0; i < items.length; i++) {
+    const section = items[i];
+    if (Math.abs(i - centerIndex) <= PRELOAD_RADIUS) {
+      assignSrc(section);
+    } else {
+      releaseSrc(section);
+    }
+  }
+}
+
 function buildItem(file) {
   const section = document.createElement("section");
   section.className = "video-item";
+  section.dataset.fileId = file.id;
 
   const video = document.createElement("video");
-  video.src = videoSrc(file.id);
   video.loop = true;
   video.muted = true;
   video.playsInline = true;
@@ -210,12 +261,14 @@ function buildItem(file) {
 }
 
 function playVisible(video, section) {
+  // Jaga-jaga: kalau karena scroll cepat video ini belum sempat dimuat
+  // oleh ensureWindow, muat sekarang juga.
+  if (video.dataset.loaded !== "1") assignSrc(section);
+
   // Kalau audio sudah "unlocked" dari interaksi sebelumnya, coba nyalakan
   // suara otomatis untuk video baru ini juga.
   if (audioUnlocked) video.muted = false;
   updateMuteButton(section, video);
-
-  if (video.preload === "none") video.preload = "auto";
 
   if (video.readyState < 3) {
     section.querySelector(".buffer-spinner").classList.add("show");
@@ -233,31 +286,55 @@ function playVisible(video, section) {
   });
 }
 
-function preloadNext(section) {
-  const next = section.nextElementSibling;
-  if (!next) return;
-  const nextVideo = next.querySelector("video");
-  if (nextVideo && nextVideo.preload === "none") {
-    nextVideo.preload = "auto";
+// Ambil halaman berikutnya dari Drive kalau posisi sekarang sudah dekat
+// dengan ujung daftar video yang sudah dimuat (infinite scroll).
+async function loadMoreIfNeeded() {
+  if (isFetchingMore || !nextPageToken) return;
+  const remaining = feedEl.children.length - 1 - currentIndex;
+  if (remaining > 2) return; // masih ada beberapa video lagi di depan, belum perlu
+
+  isFetchingMore = true;
+  try {
+    const { files, nextPageToken: token } = await fetchVideoPage(nextPageToken);
+    nextPageToken = token;
+    const fragment = document.createDocumentFragment();
+    files.forEach((f) => {
+      const section = buildItem(f);
+      fragment.appendChild(section);
+      observer.observe(section);
+    });
+    feedEl.appendChild(fragment);
+  } catch (err) {
+    // Gagal memuat halaman berikutnya tidak boleh mengganggu video yang
+    // sedang ditonton; cukup dicatat, video yang sudah ada tetap jalan.
+    console.error("Gagal memuat video berikutnya:", err);
+  } finally {
+    isFetchingMore = false;
   }
 }
 
 function setupAutoplay() {
-  const observer = new IntersectionObserver(
+  observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         const section = entry.target;
         const video = section.querySelector("video");
         if (!video) return;
+
+        if (entry.isIntersecting && entry.intersectionRatio > 0.05) {
+          currentIndex = Array.prototype.indexOf.call(feedEl.children, section);
+          ensureWindow(currentIndex);
+          loadMoreIfNeeded();
+        }
+
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
           playVisible(video, section);
-          preloadNext(section);
         } else {
           video.pause();
         }
       });
     },
-    { threshold: [0, 0.6, 1] }
+    { threshold: [0, 0.05, 0.6, 1] }
   );
   document.querySelectorAll(".video-item").forEach((el) => observer.observe(el));
 }
@@ -270,7 +347,8 @@ async function init() {
 
   showStatus("loading");
   try {
-    const files = await fetchVideoList();
+    const { files, nextPageToken: token } = await fetchVideoPage(null);
+    nextPageToken = token;
     if (files.length === 0) {
       showStatus("empty");
       return;
@@ -280,6 +358,7 @@ async function init() {
     feedEl.appendChild(fragment);
     showStatus(null);
     setupAutoplay();
+    ensureWindow(0);
   } catch (err) {
     showStatus("error", err.message);
   }
