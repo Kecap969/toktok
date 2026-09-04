@@ -136,9 +136,9 @@ html, body {
   fill: var(--accent);
 }
 
-/* ---------- Indikator mute ---------- */
+/* ---------- Tombol mute (selalu terlihat) ---------- */
 
-.mute-indicator {
+.mute-toggle {
   position: absolute;
   top: 18px;
   right: 16px;
@@ -146,22 +146,58 @@ html, body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
+  border: none;
   background: rgba(14, 15, 17, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  cursor: pointer;
+  padding: 0;
 }
 
-.mute-indicator.show {
-  opacity: 1;
-}
-
-.mute-indicator svg {
-  width: 18px;
-  height: 18px;
+.mute-toggle svg path {
   fill: var(--paper);
+}
+
+.mute-toggle svg path[stroke] {
+  stroke: var(--paper);
+  fill: none;
+}
+
+/* ---------- Ikon play/pause di tengah (muncul sekilas saat tap) ---------- */
+
+.center-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: 64px;
+  height: 64px;
+  transform: translate(-50%, -50%) scale(0.8);
+  background: rgba(14, 15, 17, 0.45);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.center-icon svg {
+  width: 28px;
+  height: 28px;
+  fill: var(--paper);
+}
+
+.center-icon.show {
+  animation: pop-fade 0.7s ease forwards;
+}
+
+@keyframes pop-fade {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
 /* ---------- Header ---------- */

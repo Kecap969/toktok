@@ -10,9 +10,15 @@ const ICONS = {
   share: `<svg viewBox="0 0 24 24"><path d="M14 3v4c-5 .6-8 3.3-9 8 2.2-2.6 5-4 9-4v4l8-6-8-6z"/></svg>`,
   muted: `<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M17 8l4 8m0-8l-4 8" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
   unmuted: `<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
+  play: `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`,
+  pause: `<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>`,
 };
 
 const likedKey = (id) => `feed:liked:${id}`;
+
+// Sekali true, semua video (yang sedang main maupun yang akan datang)
+// otomatis main dengan suara nyala, tanpa perlu tap ulang per video.
+let audioUnlocked = false;
 
 function showStatus(which, detail) {
   loadingEl.classList.add("hidden");
@@ -48,6 +54,20 @@ function videoSrc(fileId) {
   return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
 }
 
+function flashCenterIcon(section, which) {
+  const icon = section.querySelector(".center-icon");
+  icon.innerHTML = which === "play" ? ICONS.play : ICONS.pause;
+  icon.classList.remove("show");
+  // force reflow supaya animasi bisa restart kalau di-tap cepat berturut-turut
+  void icon.offsetWidth;
+  icon.classList.add("show");
+}
+
+function updateMuteButton(section, video) {
+  const btn = section.querySelector(".mute-toggle");
+  btn.innerHTML = video.muted ? ICONS.muted : ICONS.unmuted;
+}
+
 function buildItem(file) {
   const section = document.createElement("section");
   section.className = "video-item";
@@ -59,16 +79,32 @@ function buildItem(file) {
   video.playsInline = true;
   video.preload = "none";
 
-  const muteBadge = document.createElement("div");
-  muteBadge.className = "mute-indicator show";
-  muteBadge.innerHTML = ICONS.muted;
+  const centerIcon = document.createElement("div");
+  centerIcon.className = "center-icon";
+
+  const muteBtn = document.createElement("button");
+  muteBtn.className = "mute-toggle";
+  muteBtn.innerHTML = ICONS.muted;
+  muteBtn.addEventListener("click", (e) => {
+    e.stopPropagation(); // supaya tidak sekaligus trigger play/pause
+    audioUnlocked = true;
+    video.muted = !video.muted;
+    updateMuteButton(section, video);
+  });
 
   video.addEventListener("click", () => {
-    video.muted = !video.muted;
-    muteBadge.innerHTML = video.muted ? ICONS.muted : ICONS.unmuted;
-    muteBadge.classList.add("show");
-    clearTimeout(video._muteTimer);
-    video._muteTimer = setTimeout(() => muteBadge.classList.remove("show"), 900);
+    audioUnlocked = true;
+    if (video.muted) {
+      video.muted = false;
+      updateMuteButton(section, video);
+    }
+    if (video.paused) {
+      video.play().catch(() => {});
+      flashCenterIcon(section, "play");
+    } else {
+      video.pause();
+      flashCenterIcon(section, "pause");
+    }
   });
 
   const meta = document.createElement("div");
@@ -83,17 +119,20 @@ function buildItem(file) {
   const likeBtn = document.createElement("button");
   likeBtn.className = liked ? "liked" : "";
   likeBtn.innerHTML = `${ICONS.heart}<span>Suka</span>`;
-  likeBtn.addEventListener("click", () => {
+  likeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
     const now = likeBtn.classList.toggle("liked");
     localStorage.setItem(likedKey(file.id), now ? "1" : "0");
   });
 
   const commentBtn = document.createElement("button");
   commentBtn.innerHTML = `${ICONS.comment}<span>Komentar</span>`;
+  commentBtn.addEventListener("click", (e) => e.stopPropagation());
 
   const shareBtn = document.createElement("button");
   shareBtn.innerHTML = `${ICONS.share}<span>Bagikan</span>`;
-  shareBtn.addEventListener("click", async () => {
+  shareBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
     const url = `https://drive.google.com/file/d/${file.id}/view`;
     if (navigator.share) {
       navigator.share({ url }).catch(() => {});
@@ -103,19 +142,39 @@ function buildItem(file) {
   });
 
   rail.append(likeBtn, commentBtn, shareBtn);
-  section.append(video, muteBadge, meta, rail);
+  section.append(video, centerIcon, muteBtn, meta, rail);
   return section;
+}
+
+function playVisible(video, section) {
+  // Kalau audio sudah "unlocked" dari interaksi sebelumnya, coba nyalakan
+  // suara otomatis untuk video baru ini juga.
+  if (audioUnlocked) video.muted = false;
+  updateMuteButton(section, video);
+
+  if (video.preload === "none") video.preload = "auto";
+
+  video.play().catch(() => {
+    // Kalau browser tetap menolak autoplay bersuara (mis. belum ada
+    // interaksi sama sekali di halaman ini), jatuhkan ke muted supaya
+    // video tetap jalan, lalu tunggu tap pertama.
+    if (!video.muted) {
+      video.muted = true;
+      updateMuteButton(section, video);
+      video.play().catch(() => {});
+    }
+  });
 }
 
 function setupAutoplay() {
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
-        const video = entry.target.querySelector("video");
+        const section = entry.target;
+        const video = section.querySelector("video");
         if (!video) return;
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
-          if (video.preload === "none") video.preload = "auto";
-          video.play().catch(() => {});
+          playVisible(video, section);
         } else {
           video.pause();
         }
