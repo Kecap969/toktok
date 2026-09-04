@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Feed</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <div id="topbar"><span>Feed</span></div>
+
+  <div id="feed"></div>
+
+  <div id="loading" class="status">
+    <div class="spinner"></div>
+    <h2>Memuat video…</h2>
+  </div>
+
+  <div id="empty" class="status hidden">
+    <h2>Belum ada video</h2>
+    <p>Folder Google Drive yang dikonfigurasi belum berisi file video, atau belum di-share sebagai publik.</p>
+  </div>
+
+  <div id="error" class="status hidden">
+    <h2>Gagal memuat feed</h2>
+    <p id="error-detail">Terjadi kesalahan.</p>
+    <p>Periksa <code>config.js</code>: API key, folder ID, dan pastikan folder di-share "Anyone with the link".</p>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
