@@ -140,25 +140,27 @@ html, body {
   fill: var(--accent);
 }
 
-/* ---------- Spinner buffering (muncul saat video masih memuat) ---------- */
+/* ---------- Label buffering (muncul saat video masih memuat) ---------- */
 
-.buffer-spinner {
+.buffer-label {
   position: absolute;
   top: 50%;
   left: 50%;
   z-index: 1;
   transform: translate(-50%, -50%);
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 3px solid rgba(246, 245, 241, 0.2);
-  border-top-color: var(--paper);
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: rgba(14, 15, 17, 0.55);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
   opacity: 0;
   pointer-events: none;
-  animation: spin 0.8s linear infinite;
+  transition: opacity 0.2s ease;
 }
 
-.buffer-spinner.show {
+.buffer-label.show {
   opacity: 1;
 }
 
@@ -387,19 +389,6 @@ html, body {
   padding: 32px;
   text-align: center;
   color: var(--paper);
-}
-
-.status .spinner {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 3px solid var(--line);
-  border-top-color: var(--accent);
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .status h2 {
