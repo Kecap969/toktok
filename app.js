@@ -32,6 +32,14 @@ function showStatus(which, detail) {
   }
 }
 
+// Catat IP + info device pengunjung ke Supabase (buat patokan di dashboard
+// admin nanti). Fire-and-forget: gak ditunggu & gak boleh ganggu load video
+// kalau gagal/lambat.
+function logVisit() {
+  if (!SUPABASE_FUNCTIONS_URL || SUPABASE_FUNCTIONS_URL.includes("TEMPEL")) return;
+  fetch(`${SUPABASE_FUNCTIONS_URL}/log-visit`, { method: "POST" }).catch(() => {});
+}
+
 async function fetchVideoList() {
   const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/video-list`);
   const data = await res.json().catch(() => ({}));
@@ -386,6 +394,8 @@ async function init() {
     showStatus("error", "GOOGLE_DRIVE_API_KEY belum diisi di config.js (dipakai untuk streaming video langsung dari Drive).");
     return;
   }
+
+  logVisit();
 
   showStatus("loading");
   try {
