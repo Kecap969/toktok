@@ -60,6 +60,10 @@ html, body {
   width: 100%;
   object-fit: cover;
   background: #111;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  pointer-events: auto;
 }
 
 .video-item::after {
@@ -136,7 +140,22 @@ html, body {
   fill: var(--accent);
 }
 
-/* ---------- Tombol mute (selalu terlihat) ---------- */
+/* ---------- Watermark (deterrent, bukan proteksi mutlak) ---------- */
+
+.watermark {
+  position: absolute;
+  z-index: 1;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-18deg);
+  color: rgba(246, 245, 241, 0.16);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
 
 .mute-toggle {
   position: absolute;
