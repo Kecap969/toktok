@@ -148,18 +148,68 @@ function buildItem(file) {
 
   const errorMsg = document.createElement("div");
   errorMsg.className = "video-error hidden";
-  errorMsg.innerHTML = `<p>Video gagal dimuat.</p><button type="button" class="retry-btn">Coba lagi</button>`;
+  errorMsg.innerHTML = `<p class="video-error-text">Video gagal dimuat.</p><button type="button" class="retry-btn">Coba lagi</button>`;
+  const errorTextEl = errorMsg.querySelector(".video-error-text");
+
+  // Maksimal auto-retry untuk error yang sifatnya sementara (jaringan putus-nyambung).
+  // Kuota/file-hilang tidak di-auto-retry karena nunggu tidak akan menyelesaikannya.
+  const MAX_AUTO_RETRIES = 2;
+  section.dataset.retries = "0";
+
+  // <video src> tidak kasih tahu status HTTP di baliknya, jadi saat error kita
+  // cek ulang lewat fetch() supaya tahu penyebab sebenarnya: kuota Drive habis
+  // (403), file sudah dihapus/tidak publik (404), atau memang jaringan bermasalah.
+  async function diagnoseError() {
+    try {
+      const res = await fetch(video.src, {
+        method: "GET",
+        headers: { Range: "bytes=0-0" },
+      });
+      if (res.status === 403) {
+        return { reason: "quota", text: "Kuota unduh Google Drive untuk video ini sudah habis hari ini. Coba lagi beberapa jam lagi." };
+      }
+      if (res.status === 404) {
+        return { reason: "missing", text: "Video tidak ditemukan. Kemungkinan sudah dihapus atau berbagi filenya diubah ke privat." };
+      }
+      if (!res.ok) {
+        return { reason: "http", text: `Video gagal dimuat (HTTP ${res.status}).` };
+      }
+      return { reason: "network", text: "Koneksi terputus saat memuat video. Periksa koneksi internet Anda." };
+    } catch {
+      return { reason: "network", text: "Koneksi terputus saat memuat video. Periksa koneksi internet Anda." };
+    }
+  }
+
+  async function handleVideoError() {
+    spinner.classList.remove("show");
+    const diagnosis = await diagnoseError();
+    const retries = Number(section.dataset.retries || "0");
+
+    if (diagnosis.reason === "network" && retries < MAX_AUTO_RETRIES) {
+      section.dataset.retries = String(retries + 1);
+      spinner.classList.add("show");
+      const delay = retries === 0 ? 1500 : 3000; // backoff: 1.5s lalu 3s
+      setTimeout(() => {
+        video.load();
+        video.play().catch(() => {});
+      }, delay);
+      return;
+    }
+
+    errorTextEl.textContent = diagnosis.text;
+    errorMsg.classList.remove("hidden");
+  }
 
   video.addEventListener("waiting", () => spinner.classList.add("show"));
   video.addEventListener("playing", () => spinner.classList.remove("show"));
   video.addEventListener("canplay", () => spinner.classList.remove("show"));
   video.addEventListener("error", () => {
-    spinner.classList.remove("show");
-    errorMsg.classList.remove("hidden");
+    handleVideoError();
   });
 
   errorMsg.querySelector(".retry-btn").addEventListener("click", (e) => {
     e.stopPropagation();
+    section.dataset.retries = "0";
     errorMsg.classList.add("hidden");
     spinner.classList.add("show");
     video.load();
