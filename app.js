@@ -166,11 +166,19 @@ playerEl.addEventListener("contextmenu", (e) => e.preventDefault());
 playerEl.addEventListener("dragstart", (e) => e.preventDefault());
 
 // ---------- Heartbeat viewer (untuk halaman admin) ----------
-// Mengirim posisi tonton saat ini secara berkala ke tabel Supabase
-// "viewer_sessions", supaya halaman admin bisa lihat siapa nonton apa,
-// realtime. Tabel ini TIDAK bisa dibaca langsung dari browser (RLS: hanya
-// insert/update, tanpa select) — hanya edge function admin-sessions yang
-// bisa membacanya, dan itu pun harus pakai password.
+// Mengirim posisi tonton saat ini secara berkala ke Edge Function
+// "viewer-heartbeat", yang lalu meng-upsert ke tabel Supabase
+// "viewer_sessions" pakai service role di server (bukan lewat REST API
+// langsung dari browser). Alasannya dua:
+//   1. Browser tidak pernah butuh (dan tidak diberi) akses tulis langsung
+//      ke tabel ini lagi — jadi tidak perlu policy RLS untuk anon sama
+//      sekali, termasuk tidak perlu policy SELECT yang tadinya jadi celah
+//      privasi hanya demi memenuhi kebutuhan upsert (ON CONFLICT DO UPDATE).
+//   2. IP address viewer diambil dari header request di sisi server, yang
+//      jauh lebih bisa diandalkan daripada mencoba mendeteksi IP sendiri
+//      dari JavaScript di browser (dan browser memang tidak bisa itu).
+// Halaman admin tetap hanya bisa membaca datanya lewat edge function
+// admin-sessions, dan itu pun harus pakai password.
 
 const VIEWER_SESSION_ID = (function () {
   const key = "feed:session-id";
@@ -188,21 +196,15 @@ let currentFile = null;
 async function sendHeartbeat() {
   if (!currentFile || !playerEl.duration) return;
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/viewer_sessions`, {
+    await fetch(`${SUPABASE_FUNCTIONS_URL}/viewer-heartbeat`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: VIEWER_SESSION_ID,
         video_id: currentFile.id,
         video_name: prettifyCaption(currentFile.name),
         current_time_sec: playerEl.currentTime,
         duration_sec: playerEl.duration,
-        updated_at: new Date().toISOString(),
       }),
     });
   } catch {

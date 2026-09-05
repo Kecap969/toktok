@@ -189,6 +189,24 @@ html, body {
   color: rgba(14, 15, 17, 0.6);
   font-variant-numeric: tabular-nums;
 }
+
+.session-viewer {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(14, 15, 17, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.session-viewer .ip {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.session-viewer .dot {
+  opacity: 0.4;
+}
 </style>
 </head>
 <body>
@@ -287,7 +305,19 @@ function renderSessions(sessions) {
     time.className = "session-time";
     time.textContent = `${formatTime(s.current_time_sec)} / ${formatTime(s.duration_sec)}`;
 
-    li.append(header, track, time);
+    const viewer = document.createElement("div");
+    viewer.className = "session-viewer";
+    const ip = document.createElement("span");
+    ip.className = "ip";
+    ip.textContent = s.ip_address || "IP tidak diketahui";
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.textContent = "•";
+    const device = document.createElement("span");
+    device.textContent = [s.device_type, s.os, s.browser].filter(Boolean).join(" · ") || "Device tidak diketahui";
+    viewer.append(ip, dot, device);
+
+    li.append(header, track, time, viewer);
     sessionsList.appendChild(li);
   });
 }
