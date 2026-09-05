@@ -1,10 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-  --ink: #0e0f11;
-  --paper: #f6f5f1;
-  --accent: #2d6cdf;
-  --line: rgba(14, 15, 17, 0.1);
-  --card-bg: #ffffff;
-  --bg: #f1f1f3;
+  --bg: #121014;
+  --surface: #1b171b;
+  --card: #1f1a1e;
+  --ink: #f4efe6;
+  --muted: rgba(244, 239, 230, 0.56);
+  --muted-strong: rgba(244, 239, 230, 0.72);
+  --line: rgba(244, 239, 230, 0.09);
+  --accent: #c99a52;
+  --accent-bright: #e0b673;
+  --accent-wash: rgba(201, 154, 82, 0.14);
+  --danger: #d9776a;
+  --serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * {
@@ -16,43 +25,50 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--sans);
 }
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--accent-bright);
+}
+
+/* ---------- Topbar ---------- */
 
 #topbar {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--card-bg);
-  padding: 18px 18px 16px;
+  background: rgba(18, 16, 20, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 16px 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 2px solid transparent;
-  border-image: linear-gradient(90deg, #b8892d, #ecd08c, #b8892d) 1;
-  box-shadow: 0 3px 14px rgba(14, 15, 17, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 #logo {
-  height: 46px;
+  height: 40px;
   width: auto;
   display: block;
-  filter: drop-shadow(0 1px 3px rgba(14, 15, 17, 0.1));
 }
 
 #app {
   max-width: 720px;
   margin: 0 auto;
-  padding: 18px 14px 60px;
+  padding: 20px 16px 64px;
 }
 
 /* ---------- Player ---------- */
 
 #player-wrap {
   background: #000;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
 }
 
 #player-stage {
@@ -71,8 +87,6 @@ html, body {
   user-select: none;
 }
 
-/* Saat mode fullscreen aktif, batas 70vh di atas harus dilepas supaya
-   video mengisi layar penuh (bukan kecil di tengah dengan bar hitam). */
 #player-stage:fullscreen {
   width: 100%;
   height: 100%;
@@ -103,28 +117,34 @@ html, body {
   object-fit: contain;
 }
 
-/* Tombol play besar di tengah, tampil saat video pause/belum mulai */
 #big-play {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 64px;
-  height: 64px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(244, 239, 230, 0.25);
+  background: rgba(18, 16, 20, 0.55);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+#big-play:hover {
+  background: rgba(18, 16, 20, 0.75);
+  transform: translate(-50%, -50%) scale(1.04);
 }
 
 #big-play svg {
-  width: 28px;
-  height: 28px;
-  fill: var(--paper);
+  width: 26px;
+  height: 26px;
+  fill: var(--accent-bright);
   margin-left: 3px;
 }
 
@@ -140,9 +160,9 @@ html, body {
   bottom: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.7) 40%);
+  gap: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.75) 45%);
 }
 
 #controls-bar button {
@@ -154,17 +174,23 @@ html, body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--paper);
+  color: var(--ink);
+  opacity: 0.9;
+  transition: opacity 0.15s ease;
+}
+
+#controls-bar button:hover {
+  opacity: 1;
 }
 
 #controls-bar svg {
-  width: 20px;
-  height: 20px;
-  fill: var(--paper);
+  width: 19px;
+  height: 19px;
+  fill: var(--ink);
 }
 
 #time-current, #time-duration {
-  color: var(--paper);
+  color: var(--muted-strong);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
@@ -186,7 +212,7 @@ html, body {
   right: 0;
   height: 3px;
   border-radius: 2px;
-  background: rgba(246, 245, 241, 0.3);
+  background: rgba(244, 239, 230, 0.22);
 }
 
 #seek-fill {
@@ -198,43 +224,45 @@ html, body {
   pointer-events: none;
 }
 
-/* Bulatan penanda posisi (handle) di ujung progress bar, biar gampang
-   dilihat lagi di posisi mana video sedang diputar / mau di-drag ke mana. */
 #seek-fill::after {
   content: "";
   position: absolute;
   top: 50%;
   right: 0;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--accent);
+  background: var(--accent-bright);
+  border: 2px solid #121014;
   transform: translate(50%, -50%);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
 #player-info {
-  padding: 12px 14px;
-  background: var(--card-bg);
+  padding: 16px 4px 4px;
+  background: transparent;
 }
 
 #player-title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.4;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.001em;
+  color: var(--ink);
 }
 
 /* ---------- Playlist ---------- */
 
 .list-heading {
-  margin: 24px 0 10px;
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(14, 15, 17, 0.6);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  margin: 30px 0 14px;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
 }
 
 #video-list {
@@ -250,30 +278,31 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  background: var(--card-bg);
-  border-radius: 8px;
-  padding: 6px;
+  background: var(--card);
+  border-radius: 10px;
+  padding: 7px;
   cursor: pointer;
   border: 1px solid var(--line);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
 #video-list li:hover {
-  background: #fafafa;
+  border-color: rgba(244, 239, 230, 0.2);
+  transform: translateY(-1px);
 }
 
 #video-list li.active {
   border-color: var(--accent);
-  background: rgba(45, 108, 223, 0.06);
+  background: var(--accent-wash);
 }
 
 .thumb-wrap {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 5px;
+  border-radius: 6px;
   overflow: hidden;
-  background: #ddd;
+  background: #2a2429;
 }
 
 .thumb {
@@ -282,12 +311,12 @@ html, body {
   aspect-ratio: 16 / 9;
   flex-shrink: 0;
   object-fit: cover;
-  border-radius: 5px;
-  background: #ddd;
+  border-radius: 6px;
+  background: #2a2429;
 }
 
 .thumb.no-thumb {
-  background: #ddd;
+  background: #2a2429;
 }
 
 #player-loading {
@@ -296,7 +325,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   pointer-events: none;
   transition: opacity 0.15s ease;
 }
@@ -307,11 +336,11 @@ html, body {
 
 #player-loading::after {
   content: "";
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.25);
-  border-top-color: #fff;
+  border: 3px solid rgba(244, 239, 230, 0.2);
+  border-top-color: var(--accent-bright);
   animation: spin 0.8s linear infinite;
 }
 
@@ -322,9 +351,9 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(10, 9, 11, 0.9);
   text-align: center;
 }
 
@@ -334,21 +363,26 @@ html, body {
 
 #player-error-text {
   margin: 0;
-  color: #fff;
+  color: var(--muted-strong);
   font-size: 13px;
   line-height: 1.5;
   max-width: 420px;
 }
 
 #player-error-retry {
-  padding: 8px 18px;
+  padding: 9px 20px;
   border-radius: 999px;
-  border: none;
-  background: var(--accent);
-  color: #fff;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent-bright);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+#player-error-retry:hover {
+  background: var(--accent-wash);
 }
 
 .thumb-spinner {
@@ -361,10 +395,10 @@ html, body {
 
 .thumb-spinner::after {
   content: "";
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 2.5px solid rgba(14, 15, 17, 0.15);
+  border: 2.5px solid rgba(244, 239, 230, 0.15);
   border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
@@ -379,8 +413,8 @@ html, body {
   padding: 6px;
   font-size: 10px;
   line-height: 1.3;
-  color: rgba(14, 15, 17, 0.55);
-  background: #eee;
+  color: var(--muted);
+  background: #221d21;
 }
 
 /* ---------- Status states ---------- */
@@ -390,16 +424,16 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 60px 20px;
+  gap: 14px;
+  padding: 70px 20px;
   text-align: center;
 }
 
 .status .spinner {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  border: 3px solid rgba(14, 15, 17, 0.15);
+  border: 3px solid rgba(244, 239, 230, 0.15);
   border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
@@ -409,20 +443,24 @@ html, body {
 }
 
 .status h2 {
-  font-size: 16px;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 18px;
   margin: 0;
+  color: var(--ink);
 }
 
 .status p {
   font-size: 13px;
-  color: rgba(14, 15, 17, 0.65);
+  color: var(--muted);
   margin: 0;
   max-width: 420px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .status code {
-  background: rgba(14, 15, 17, 0.07);
+  background: rgba(244, 239, 230, 0.08);
+  color: var(--muted-strong);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 12px;
@@ -430,4 +468,20 @@ html, body {
 
 .hidden {
   display: none !important;
+}
+
+/* ---------- Focus visibility (accessibility) ---------- */
+
+button:focus-visible,
+#seek-track:focus-visible,
+#video-list li:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
