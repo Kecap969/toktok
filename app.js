@@ -130,23 +130,26 @@ function hidePlayerError() {
 // penyebabnya dengan request kecil (cuma 1 byte lewat header Range) ke URL
 // yang sama persis, lalu baca status HTTP dari situ.
 async function diagnosePlaybackError(src) {
+  // Catatan: fetch() ke domain googleapis.com kena aturan CORS milik Google,
+  // jadi kita TIDAK BISA membaca kode status HTTP asli (403/429/dst) dari
+  // JavaScript di browser -- percobaan sebelumnya pakai header "Range" untuk
+  // itu malah salah, karena header custom memicu "preflight request" yang
+  // gagal duluan dan bikin semua error kelihatan seperti "putus koneksi",
+  // padahal belum tentu begitu.
+  //
+  // Jadi di sini kita cuma bisa membedakan dua hal secara kasar:
+  // 1. Request sampai ke server Google (server merespons apa pun, termasuk
+  //    respons "ditolak") -> exception TIDAK terjadi.
+  // 2. Request gagal terkirim sama sekali (offline, DNS gagal, diblokir
+  //    provider/ekstensi/DNS filter sebelum sampai ke Google) -> exception
+  //    terjadi.
+  // Pakai method HEAD + mode "no-cors" supaya tidak perlu preflight dan
+  // tidak mengunduh isi video hanya untuk mengecek ini.
   try {
-    const res = await fetch(src, { headers: { Range: "bytes=0-0" } });
-    if (res.status === 403) {
-      return "Video ini belum bisa diputar sekarang — kemungkinan kuota harian Google Drive untuk file ini sudah habis, atau izin file belum diatur \"Anyone with the link\". Biasanya pulih otomatis dalam 24 jam.";
-    }
-    if (res.status === 429) {
-      return "Terlalu banyak yang menonton video ini secara bersamaan. Coba lagi dalam beberapa menit.";
-    }
-    if (res.status === 404) {
-      return "Video tidak ditemukan. Kemungkinan file sudah dihapus atau dipindahkan dari Google Drive.";
-    }
-    if (!res.ok) {
-      return `Video gagal dimuat (kode ${res.status}). Coba lagi nanti.`;
-    }
-    return "Video gagal diputar. Coba lagi, atau periksa koneksi internet Anda.";
+    await fetch(src, { method: "HEAD", mode: "no-cors" });
+    return "Video ini belum bisa diputar sekarang. Kemungkinan kuota harian Google Drive untuk file ini sudah habis, atau izin filenya belum \"Anyone with the link\". Biasanya pulih otomatis dalam 24 jam. Kalau ini terus terjadi di semua video, kemungkinan API key Google Drive-nya bermasalah (kuota API habis atau dinonaktifkan).";
   } catch {
-    return "Tidak bisa terhubung ke server video. Periksa koneksi internet Anda.";
+    return "Request ke server video gagal terkirim sama sekali. Kemungkinan koneksi internet terputus, atau ada VPN/ad-blocker/DNS yang memblokir domain googleapis.com.";
   }
 }
 
