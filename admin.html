@@ -594,7 +594,7 @@ function buildSessionCard(s) {
   body.append(header, track, time, viewer);
   li.append(video, body);
 
-  return { li, video, videoId: s.video_id, name, updated, fill, time, ip, device, prevCurrentTimeSec: null };
+  return { li, video, videoId: s.video_id, name, updated, fill, time, ip, device, prevCurrentTimeSec: null, stalledSinceAt: null };
 }
 
 // Kalau selisih posisi preview vs posisi asli viewer melebihi ini (detik),
@@ -617,6 +617,7 @@ function updateSessionCard(entry, s) {
   if (entry.videoId !== s.video_id) {
     entry.videoId = s.video_id;
     entry.prevCurrentTimeSec = null;
+    entry.stalledSinceAt = null;
     entry.updated.textContent = timeAgo(s.updated_at);
     if (s.thumbnail_url) entry.video.poster = s.thumbnail_url;
     entry.video.src = videoSrc(s.video_id);
@@ -631,13 +632,21 @@ function updateSessionCard(entry, s) {
   }
 
   // Deteksi viewer sedang pause: posisi tonton dari server (current_time_sec)
-  // tidak maju sama sekali dibanding poll sebelumnya (~2.5 detik lalu).
-  // Kalau iya, ikut jeda preview di sini juga -- daripada preview jadi
-  // lompat-lompat balik ke posisi yang sama tiap kali melebihi
-  // RESYNC_THRESHOLD_SEC, yang bikin previewnya kelihatan "nge-glitch".
+  // berhenti maju. Heartbeat pengguna cuma update tiap 4 detik sementara
+  // admin polling tiap 2 detik, jadi satu kali "belum berubah" itu WAJAR
+  // (kebetulan heartbeat berikutnya belum sampai) -- bukan berarti pause.
+  // Baru dianggap pause kalau posisinya diam lebih lama dari satu siklus
+  // heartbeat (>6 detik), supaya tidak salah kedip nge-label "Dijeda" pada
+  // video yang sebenarnya masih jalan normal.
+  const PAUSE_STALL_THRESHOLD_MS = 6000;
   const target = Number(s.current_time_sec) || 0;
-  const viewerPaused = entry.prevCurrentTimeSec !== null && Math.abs(target - entry.prevCurrentTimeSec) < 0.3;
-  entry.prevCurrentTimeSec = target;
+
+  if (entry.prevCurrentTimeSec === null || Math.abs(target - entry.prevCurrentTimeSec) >= 0.3) {
+    entry.prevCurrentTimeSec = target;
+    entry.stalledSinceAt = Date.now();
+  }
+
+  const viewerPaused = Date.now() - entry.stalledSinceAt >= PAUSE_STALL_THRESHOLD_MS;
 
   entry.updated.textContent = timeAgo(s.updated_at) + (viewerPaused ? " · Dijeda" : "");
 
