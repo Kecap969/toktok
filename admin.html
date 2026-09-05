@@ -144,6 +144,26 @@ html, body {
   border-radius: 10px;
   padding: 14px;
   border: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+}
+
+.session-thumb {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: rgba(14, 15, 17, 0.06);
+  object-fit: cover;
+}
+
+.session-thumb.no-thumb {
+  background: rgba(14, 15, 17, 0.06);
+}
+
+.session-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .session-header {
@@ -280,6 +300,19 @@ function renderSessions(sessions) {
   sessions.forEach((s) => {
     const li = document.createElement("li");
 
+    const thumb = document.createElement("img");
+    thumb.className = "session-thumb";
+    thumb.loading = "lazy";
+    thumb.alt = "";
+    if (s.thumbnail_url) {
+      thumb.src = s.thumbnail_url;
+    } else {
+      thumb.classList.add("no-thumb");
+    }
+
+    const body = document.createElement("div");
+    body.className = "session-body";
+
     const header = document.createElement("div");
     header.className = "session-header";
 
@@ -317,7 +350,8 @@ function renderSessions(sessions) {
     device.textContent = [s.device_type, s.os, s.browser].filter(Boolean).join(" · ") || "Device tidak diketahui";
     viewer.append(ip, dot, device);
 
-    li.append(header, track, time, viewer);
+    body.append(header, track, time, viewer);
+    li.append(thumb, body);
     sessionsList.appendChild(li);
   });
 }
