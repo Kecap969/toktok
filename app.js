@@ -21,6 +21,7 @@ const fullscreenBtn = document.getElementById("btn-fullscreen");
 const iconFsEnter = document.getElementById("icon-fs-enter");
 const iconFsExit = document.getElementById("icon-fs-exit");
 const playerStage = document.getElementById("player-stage");
+const playerLoadingEl = document.getElementById("player-loading");
 
 function showStatus(which, detail) {
   loadingEl.classList.add("hidden");
@@ -101,6 +102,23 @@ function togglePlayPause() {
     playerEl.pause();
   }
 }
+
+function showPlayerLoading() {
+  if (playerLoadingEl) playerLoadingEl.classList.remove("hidden");
+}
+
+function hidePlayerLoading() {
+  if (playerLoadingEl) playerLoadingEl.classList.add("hidden");
+}
+
+// Spinner muncul selama video dimuat/buffering, dan hilang begitu video
+// benar-benar mulai jalan (bukan cuma saat "play" ditekan, karena "play"
+// bisa dipanggil sebelum video siap dan masih sempat buffer).
+playerEl.addEventListener("loadstart", showPlayerLoading);
+playerEl.addEventListener("waiting", showPlayerLoading);
+playerEl.addEventListener("playing", hidePlayerLoading);
+playerEl.addEventListener("pause", hidePlayerLoading);
+playerEl.addEventListener("error", hidePlayerLoading);
 
 bigPlayBtn.addEventListener("click", togglePlayPause);
 playPauseBtn.addEventListener("click", togglePlayPause);
