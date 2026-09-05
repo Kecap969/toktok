@@ -61,6 +61,38 @@ html, body {
   user-select: none;
 }
 
+/* Saat mode fullscreen aktif, batas 70vh di atas harus dilepas supaya
+   video mengisi layar penuh (bukan kecil di tengah dengan bar hitam). */
+#player-stage:fullscreen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#player-stage:fullscreen #player {
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+#player-stage:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#player-stage:-webkit-full-screen #player {
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* Tombol play besar di tengah, tampil saat video pause/belum mulai */
 #big-play {
   position: absolute;
@@ -112,6 +144,7 @@ html, body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: var(--paper);
 }
 
 #controls-bar svg {
