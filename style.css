@@ -288,6 +288,31 @@ html, body {
   background: #ddd;
 }
 
+#player-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+#player-loading.hidden {
+  display: none;
+}
+
+#player-loading::after {
+  content: "";
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+
 .thumb-spinner {
   position: absolute;
   inset: 0;
