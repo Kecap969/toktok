@@ -259,6 +259,28 @@ html, body {
 
 /* ---------- Riwayat ---------- */
 
+#history-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+#clear-history-btn {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--danger);
+  background: #fff;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#clear-history-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 #history-list {
   list-style: none;
   margin: 0;
@@ -362,6 +384,9 @@ html, body {
     </div>
 
     <div id="history-view" class="hidden">
+      <div id="history-toolbar">
+        <button id="clear-history-btn" type="button">Bersihkan Semua</button>
+      </div>
       <div id="history-empty" class="hidden">
         <p>Belum ada riwayat kunjungan.</p>
       </div>
@@ -387,9 +412,12 @@ const historyView = document.getElementById("history-view");
 const historyList = document.getElementById("history-list");
 const historyEmpty = document.getElementById("history-empty");
 
+const clearHistoryBtn = document.getElementById("clear-history-btn");
+
 const PASSWORD_STORAGE_KEY = "admin:password";
 let pollTimer = null;
 let lastHistory = [];
+let currentPassword = null;
 
 function formatTime(seconds) {
   if (!isFinite(seconds) || seconds < 0) seconds = 0;
@@ -662,6 +690,7 @@ function schedulePoll(password) {
 }
 
 async function poll(password) {
+  currentPassword = password;
   try {
     const { sessions, history } = await fetchSessions(password);
     renderSessions(sessions);
@@ -675,6 +704,36 @@ async function poll(password) {
   }
 }
 
+async function clearHistory() {
+  if (!currentPassword) return;
+  const confirmed = confirm(
+    "Hapus semua riwayat kunjungan kecuali yang masih di web sekarang? Tindakan ini tidak bisa dibatalkan."
+  );
+  if (!confirmed) return;
+
+  clearHistoryBtn.disabled = true;
+  clearHistoryBtn.textContent = "Membersihkan…";
+  try {
+    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/admin-clear-history`, {
+      method: "POST",
+      headers: { "x-admin-password": currentPassword },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    // Langsung refresh riwayat di layar tanpa menunggu poll berikutnya.
+    const { history } = await fetchSessions(currentPassword);
+    lastHistory = history;
+    renderHistory(history);
+  } catch (err) {
+    alert(`Gagal membersihkan riwayat: ${err.message}`);
+  } finally {
+    clearHistoryBtn.disabled = false;
+    clearHistoryBtn.textContent = "Bersihkan Semua";
+  }
+}
+
+clearHistoryBtn.addEventListener("click", clearHistory);
+
 function showDashboard(password) {
   loginScreen.classList.add("hidden");
   dashboard.classList.remove("hidden");
@@ -683,6 +742,7 @@ function showDashboard(password) {
 
 function showLogin(errorMessage) {
   stopPolling();
+  currentPassword = null;
   // Hentikan semua video preview yang sedang autoplay supaya tidak terus
   // jalan di background dan makan bandwidth setelah admin keluar.
   for (const entry of sessionElements.values()) {
