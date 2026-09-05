@@ -144,6 +144,11 @@ async function diagnosePlaybackError(src) {
 }
 
 playerEl.addEventListener("error", async () => {
+  // Kode error "ABORTED" muncul WAJAR setiap kali src video diganti (misal
+  // pengguna pindah video lain, atau tombol "Coba Lagi" reload) -- browser
+  // otomatis membatalkan pemuatan yang lama. Itu bukan kegagalan sungguhan,
+  // jadi jangan ditampilkan sebagai error ke pengguna.
+  if (playerEl.error && playerEl.error.code === MediaError.MEDIA_ERR_ABORTED) return;
   const src = playerEl.currentSrc || playerEl.src;
   if (!src) return;
   const message = await diagnosePlaybackError(src);
