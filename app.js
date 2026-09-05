@@ -342,9 +342,20 @@ function stopHeartbeat() {
   heartbeatTimer = null;
 }
 
+// Heartbeat SENGAJA tetap jalan walau video di-pause -- supaya viewer masih
+// kelihatan "sedang nonton" di admin (cuma posisinya berhenti maju, karena
+// current_time_sec ikut currentTime yang memang tidak berubah saat pause).
+// Heartbeat baru benar-benar berhenti kalau:
+//   1. Video selesai (ended), atau
+//   2. Pengunjung pilih video lain (startHeartbeat dipanggil ulang dengan
+//      currentFile baru, jadi otomatis "pindah" bukan hilang), atau
+//   3. Pengunjung benar-benar keluar dari halaman (pagehide/beforeunload).
+// Dulu heartbeat berhenti begitu di-pause, jadi entry-nya langsung hilang
+// dari daftar admin walau pengunjungnya masih ada di halaman -- itu yang
+// diperbaiki di sini.
 playerEl.addEventListener("play", startHeartbeat);
-playerEl.addEventListener("pause", stopHeartbeat);
 playerEl.addEventListener("ended", stopHeartbeat);
+window.addEventListener("pagehide", stopHeartbeat);
 
 // ---------- Daftar video ----------
 
