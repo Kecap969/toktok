@@ -145,16 +145,21 @@ html, body {
   padding: 14px;
   border: 1px solid var(--line);
   display: flex;
+  align-items: flex-start;
   gap: 12px;
 }
 
 .session-thumb {
-  width: 128px;
-  height: 72px;
   flex-shrink: 0;
   border-radius: 8px;
   background: #000;
-  object-fit: cover;
+  display: block;
+  /* Ukuran sebenarnya (width/height) diset lewat JS begitu dimensi asli
+     videonya diketahui (loadedmetadata), supaya rasio aspek preview persis
+     sama seperti video aslinya -- baik itu vertikal (potret) atau
+     horizontal (lanskap). Ini cuma nilai default sebelum itu terjadi. */
+  width: 120px;
+  height: 120px;
 }
 
 .session-body {
@@ -278,6 +283,32 @@ function videoSrc(fileId) {
   return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(GOOGLE_DRIVE_API_KEY)}`;
 }
 
+// Hitung ukuran kotak preview supaya PAS mengikuti rasio aspek asli video
+// (bukan dipaksa 16:9) -- video potret (vertikal, umum di FeedTok) jadi
+// kotak tinggi & sempit, video lanskap jadi kotak lebar & pendek. Tetap
+// dibatasi biar tidak ada yang kebesaran/mengganggu layout daftar.
+const THUMB_MAX_WIDTH = 150;
+const THUMB_MAX_HEIGHT = 220;
+function fitThumbSize(naturalWidth, naturalHeight) {
+  if (!naturalWidth || !naturalHeight) return null;
+  const ratio = naturalWidth / naturalHeight;
+  let w = THUMB_MAX_WIDTH;
+  let h = w / ratio;
+  if (h > THUMB_MAX_HEIGHT) {
+    h = THUMB_MAX_HEIGHT;
+    w = h * ratio;
+  }
+  return { width: Math.round(w), height: Math.round(h) };
+}
+
+function applyNaturalSize(video) {
+  const size = fitThumbSize(video.videoWidth, video.videoHeight);
+  if (size) {
+    video.style.width = `${size.width}px`;
+    video.style.height = `${size.height}px`;
+  }
+}
+
 function timeAgo(isoString) {
   const seconds = Math.max(0, Math.round((Date.now() - new Date(isoString).getTime()) / 1000));
   if (seconds < 2) return "baru saja";
@@ -312,12 +343,14 @@ function buildSessionCard(s) {
   video.preload = "metadata";
   if (s.thumbnail_url) video.poster = s.thumbnail_url;
   video.src = videoSrc(s.video_id);
-  // Begitu durasi videonya diketahui, langsung loncat ke posisi tonton
-  // viewer saat ini, supaya preview-nya mulai dari titik yang relevan.
+  // Begitu durasi & dimensi videonya diketahui: loncat ke posisi tonton
+  // viewer saat ini, dan sesuaikan ukuran kotak preview dengan rasio aspek
+  // asli videonya (bisa potret atau lanskap).
   video.addEventListener("loadedmetadata", () => {
     try {
       video.currentTime = Number(s.current_time_sec) || 0;
     } catch {}
+    applyNaturalSize(video);
   }, { once: true });
   video.play().catch(() => {
     // Browser mungkin tetap menahan autoplay; admin tinggal tap play manual.
@@ -379,6 +412,7 @@ function updateSessionCard(entry, s) {
       try {
         entry.video.currentTime = Number(s.current_time_sec) || 0;
       } catch {}
+      applyNaturalSize(entry.video);
     }, { once: true });
     entry.video.play().catch(() => {});
   }
