@@ -228,6 +228,106 @@ html, body {
 .session-viewer .dot {
   opacity: 0.4;
 }
+
+/* ---------- Tabs ---------- */
+
+#tabs {
+  display: flex;
+  gap: 8px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 14px 14px 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card-bg);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* ---------- Riwayat ---------- */
+
+#history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#history-list li {
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+}
+
+.history-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.history-ip {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.history-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.history-badge.online {
+  background: rgba(45, 190, 110, 0.15);
+  color: #1f9d55;
+}
+
+.history-badge.offline {
+  background: rgba(14, 15, 17, 0.08);
+  color: rgba(14, 15, 17, 0.55);
+}
+
+.history-device {
+  font-size: 11.5px;
+  color: rgba(14, 15, 17, 0.55);
+  margin-bottom: 6px;
+}
+
+.history-times {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.history-times div span {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(14, 15, 17, 0.45);
+  margin-bottom: 2px;
+}
 </style>
 </head>
 <body>
@@ -248,11 +348,25 @@ html, body {
     <button id="logout-btn">Keluar</button>
   </header>
 
+  <nav id="tabs">
+    <button class="tab-btn active" id="tab-live" type="button">Sedang Ditonton</button>
+    <button class="tab-btn" id="tab-history" type="button">Riwayat Masuk/Keluar</button>
+  </nav>
+
   <main id="sessions-wrap">
-    <div id="empty-state" class="hidden">
-      <p>Belum ada yang menonton saat ini.</p>
+    <div id="live-view">
+      <div id="empty-state" class="hidden">
+        <p>Belum ada yang menonton saat ini.</p>
+      </div>
+      <ul id="sessions-list"></ul>
     </div>
-    <ul id="sessions-list"></ul>
+
+    <div id="history-view" class="hidden">
+      <div id="history-empty" class="hidden">
+        <p>Belum ada riwayat kunjungan.</p>
+      </div>
+      <ul id="history-list"></ul>
+    </div>
   </main>
 </div>
 
@@ -266,9 +380,16 @@ const loginError = document.getElementById("login-error");
 const logoutBtn = document.getElementById("logout-btn");
 const sessionsList = document.getElementById("sessions-list");
 const emptyState = document.getElementById("empty-state");
+const tabLive = document.getElementById("tab-live");
+const tabHistory = document.getElementById("tab-history");
+const liveView = document.getElementById("live-view");
+const historyView = document.getElementById("history-view");
+const historyList = document.getElementById("history-list");
+const historyEmpty = document.getElementById("history-empty");
 
 const PASSWORD_STORAGE_KEY = "admin:password";
 let pollTimer = null;
+let lastHistory = [];
 
 function formatTime(seconds) {
   if (!isFinite(seconds) || seconds < 0) seconds = 0;
@@ -323,8 +444,71 @@ async function fetchSessions(password) {
   if (!res.ok) {
     throw new Error(data?.error || `HTTP ${res.status}`);
   }
-  return data.sessions || [];
+  return { sessions: data.sessions || [], history: data.history || [] };
 }
+
+function formatDateTime(isoString) {
+  if (!isoString) return "-";
+  return new Date(isoString).toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function buildHistoryItem(h) {
+  const li = document.createElement("li");
+
+  const top = document.createElement("div");
+  top.className = "history-top";
+  const ip = document.createElement("span");
+  ip.className = "history-ip";
+  ip.textContent = h.ip_address || "IP tidak diketahui";
+  const badge = document.createElement("span");
+  badge.className = `history-badge ${h.still_online ? "online" : "offline"}`;
+  badge.textContent = h.still_online ? "Online" : "Offline";
+  top.append(ip, badge);
+
+  const device = document.createElement("div");
+  device.className = "history-device";
+  device.textContent = [h.device_type, h.os, h.browser].filter(Boolean).join(" · ") || "Device tidak diketahui";
+
+  const times = document.createElement("div");
+  times.className = "history-times";
+
+  const masuk = document.createElement("div");
+  masuk.innerHTML = `<span>Masuk</span>${formatDateTime(h.created_at)}`;
+
+  const keluar = document.createElement("div");
+  keluar.innerHTML = `<span>Keluar</span>${h.still_online ? "Masih di web" : formatDateTime(h.left_at || h.last_seen_at)}`;
+
+  times.append(masuk, keluar);
+  li.append(top, device, times);
+  return li;
+}
+
+function renderHistory(history) {
+  historyEmpty.classList.toggle("hidden", history.length > 0);
+  historyList.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  history.forEach((h) => fragment.appendChild(buildHistoryItem(h)));
+  historyList.appendChild(fragment);
+}
+
+function setActiveTab(tab) {
+  const isLive = tab === "live";
+  tabLive.classList.toggle("active", isLive);
+  tabHistory.classList.toggle("active", !isLive);
+  liveView.classList.toggle("hidden", !isLive);
+  historyView.classList.toggle("hidden", isLive);
+  if (!isLive) renderHistory(lastHistory);
+}
+
+tabLive.addEventListener("click", () => setActiveTab("live"));
+tabHistory.addEventListener("click", () => setActiveTab("history"));
 
 // Map session_id -> elemen DOM yang sudah dibuat, supaya video preview yang
 // sedang autoplay TIDAK di-reset (dan tidak "loncat"/restart) tiap kali poll
@@ -459,8 +643,10 @@ function schedulePoll(password) {
 
 async function poll(password) {
   try {
-    const sessions = await fetchSessions(password);
+    const { sessions, history } = await fetchSessions(password);
     renderSessions(sessions);
+    lastHistory = history;
+    if (!historyView.classList.contains("hidden")) renderHistory(history);
     schedulePoll(password);
   } catch (err) {
     // Password ternyata salah/expired di tengah jalan -> kembali ke login.
