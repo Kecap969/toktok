@@ -20,6 +20,11 @@
       <video id="player" playsinline preload="none" disablePictureInPicture controlsList="nodownload noremoteplayback"></video>
       <div id="player-loading" class="hidden"></div>
 
+      <div id="player-error" class="hidden">
+        <p id="player-error-text">Video tidak bisa diputar.</p>
+        <button id="player-error-retry">Coba Lagi</button>
+      </div>
+
       <button id="big-play" aria-label="Putar">
         <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       </button>
