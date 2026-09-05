@@ -5,14 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Admin - Sedang Ditonton</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-  --ink: #0e0f11;
-  --paper: #f6f5f1;
-  --accent: #2d6cdf;
-  --danger: #d64545;
-  --line: rgba(14, 15, 17, 0.1);
-  --card-bg: #ffffff;
-  --bg: #f1f1f3;
+  --bg: #0b0c0f;
+  --surface: #121317;
+  --card: #16181d;
+  --card-hover: #1b1e24;
+  --ink: #eef0f2;
+  --muted: rgba(238, 240, 242, 0.52);
+  --muted-strong: rgba(238, 240, 242, 0.72);
+  --line: rgba(238, 240, 242, 0.08);
+  --accent: #dc1f39;
+  --accent-bright: #ff4757;
+  --accent-wash: rgba(220, 31, 57, 0.14);
+  --online: #35c07a;
+  --online-wash: rgba(53, 192, 122, 0.14);
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 * {
@@ -39,54 +48,83 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(220, 31, 57, 0.08), transparent 55%),
+    var(--bg);
 }
 
 #login-box {
   width: 100%;
   max-width: 320px;
-  background: var(--card-bg);
-  border-radius: 14px;
-  padding: 28px 24px;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px 26px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
   text-align: center;
 }
 
 #login-box h1 {
   margin: 0 0 8px;
-  font-size: 20px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 #login-box p {
-  margin: 0 0 18px;
+  margin: 0 0 20px;
   font-size: 13px;
-  color: rgba(14, 15, 17, 0.65);
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 #password-input {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 11px 13px;
+  border-radius: 9px;
   border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
   font-size: 15px;
   margin-bottom: 12px;
+  transition: border-color 0.15s ease;
+}
+
+#password-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#password-input::placeholder {
+  color: var(--muted);
 }
 
 #login-btn {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 11px 12px;
+  border-radius: 9px;
   border: none;
   background: var(--accent);
-  color: var(--paper);
+  color: #fff;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+#login-btn:hover {
+  background: var(--accent-bright);
+}
+
+#login-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 #login-error {
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: 13px;
-  color: var(--danger);
+  color: var(--accent-bright);
 }
 
 /* ---------- Dashboard ---------- */
@@ -95,39 +133,62 @@ html, body {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--surface);
+  color: var(--ink);
   padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  border-bottom: 1px solid var(--line);
 }
 
 #topbar span {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
+}
+
+#topbar span::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-wash);
+  flex-shrink: 0;
 }
 
 #logout-btn {
-  background: none;
-  border: 1px solid rgba(246, 245, 241, 0.35);
-  color: var(--paper);
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted-strong);
   font-size: 12px;
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 7px 14px;
   border-radius: 999px;
   cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+#logout-btn:hover {
+  border-color: var(--accent);
+  color: var(--ink);
 }
 
 #sessions-wrap {
   max-width: 720px;
   margin: 0 auto;
-  padding: 18px 14px 60px;
+  padding: 4px 14px 60px;
 }
 
 #empty-state {
-  padding: 60px 20px;
+  padding: 70px 20px;
   text-align: center;
-  color: rgba(14, 15, 17, 0.6);
+  color: var(--muted);
+  font-size: 13.5px;
 }
 
 #sessions-list {
@@ -136,17 +197,34 @@ html, body {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 #sessions-list li {
-  background: var(--card-bg);
-  border-radius: 10px;
+  background: var(--card);
+  border-radius: 12px;
   padding: 12px;
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
+}
+
+#sessions-list li::before {
+  content: "LIVE";
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: var(--accent);
+  padding: 3px 7px;
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 .session-thumb {
@@ -165,6 +243,7 @@ html, body {
 
 .session-body {
   min-width: 0;
+  padding: 0 4px;
 }
 
 .session-header {
@@ -172,7 +251,7 @@ html, body {
   justify-content: space-between;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 9px;
 }
 
 .session-video-name {
@@ -181,21 +260,22 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--ink);
 }
 
 .session-updated {
   font-size: 11px;
-  color: rgba(14, 15, 17, 0.5);
+  color: var(--muted);
   flex-shrink: 0;
 }
 
 .session-progress-track {
   position: relative;
-  height: 6px;
+  height: 5px;
   border-radius: 3px;
-  background: rgba(14, 15, 17, 0.1);
+  background: var(--line);
   overflow: hidden;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .session-progress-fill {
@@ -207,14 +287,17 @@ html, body {
 
 .session-time {
   font-size: 12px;
-  color: rgba(14, 15, 17, 0.6);
+  color: var(--muted-strong);
   font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
 }
 
 .session-viewer {
-  margin-top: 6px;
-  font-size: 11px;
-  color: rgba(14, 15, 17, 0.55);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--muted-strong);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -222,7 +305,8 @@ html, body {
 
 .session-viewer .ip {
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--mono);
+  color: var(--ink);
 }
 
 .session-viewer .dot {
@@ -233,28 +317,37 @@ html, body {
 
 #tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   max-width: 720px;
   margin: 0 auto;
-  padding: 14px 14px 0;
+  padding: 14px 14px 14px;
+  background: var(--bg);
+  position: sticky;
+  top: 61px;
+  z-index: 4;
 }
 
 .tab-btn {
   flex: 1;
   padding: 9px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--card-bg);
-  color: var(--ink);
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted-strong);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
 }
 
 .tab-btn.active {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line);
 }
 
 /* ---------- Riwayat ---------- */
@@ -262,23 +355,29 @@ html, body {
 #history-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 #clear-history-btn {
-  padding: 7px 14px;
+  padding: 8px 15px;
   border-radius: 999px;
-  border: 1px solid var(--danger);
-  background: #fff;
-  color: var(--danger);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent-bright);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+#clear-history-btn:hover {
+  background: var(--accent-wash);
 }
 
 #clear-history-btn:disabled {
   opacity: 0.5;
   cursor: default;
+  background: transparent;
 }
 
 #history-list {
@@ -291,9 +390,9 @@ html, body {
 }
 
 #history-list li {
-  background: var(--card-bg);
+  background: var(--card);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 13px 14px;
   border: 1px solid var(--line);
 }
 
@@ -302,53 +401,76 @@ html, body {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .history-ip {
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--mono);
+  color: var(--ink);
 }
 
 .history-badge {
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .history-badge.online {
-  background: rgba(45, 190, 110, 0.15);
-  color: #1f9d55;
+  background: var(--online-wash);
+  color: var(--online);
 }
 
 .history-badge.offline {
-  background: rgba(14, 15, 17, 0.08);
-  color: rgba(14, 15, 17, 0.55);
+  background: rgba(238, 240, 242, 0.06);
+  color: var(--muted);
 }
 
 .history-device {
   font-size: 11.5px;
-  color: rgba(14, 15, 17, 0.55);
-  margin-bottom: 6px;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
 
 .history-times {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   font-size: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 .history-times div span {
   display: block;
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: rgba(14, 15, 17, 0.45);
-  margin-bottom: 2px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.history-times div {
+  font-family: var(--mono);
+  color: var(--muted-strong);
+}
+
+/* ---------- Accessibility ---------- */
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.001ms !important;
+  }
 }
 </style>
 </head>
