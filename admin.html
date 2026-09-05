@@ -576,6 +576,12 @@ function buildSessionCard(s) {
   return { li, video, videoId: s.video_id, name, updated, fill, time, ip, device };
 }
 
+// Kalau selisih posisi preview vs posisi asli viewer melebihi ini (detik),
+// preview dianggap "meleset" (viewer maju/mundurin videonya) dan di-seek
+// ulang supaya sinkron lagi. Jangan set terlalu kecil, karena drift wajar
+// dari jeda polling (2.5 detik) + buffering juga bisa sebesar ini.
+const RESYNC_THRESHOLD_SEC = 3;
+
 function updateSessionCard(entry, s) {
   entry.name.textContent = s.video_name;
   entry.updated.textContent = timeAgo(s.updated_at);
@@ -599,6 +605,20 @@ function updateSessionCard(entry, s) {
       applyNaturalSize(entry.video);
     }, { once: true });
     entry.video.play().catch(() => {});
+    return;
+  }
+
+  // Video sama seperti sebelumnya -- cek apakah viewer maju/mundurin
+  // videonya (seek). Kalau selisihnya jauh, susul posisi preview ke sana.
+  // readyState > 0 berarti metadata (termasuk currentTime) sudah bisa dibaca.
+  const target = Number(s.current_time_sec) || 0;
+  if (entry.video.readyState > 0) {
+    const drift = Math.abs(entry.video.currentTime - target);
+    if (drift > RESYNC_THRESHOLD_SEC) {
+      try {
+        entry.video.currentTime = target;
+      } catch {}
+    }
   }
 }
 
