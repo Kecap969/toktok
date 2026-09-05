@@ -290,7 +290,7 @@ function playVideo(file, itemEl) {
     // untuk user tap manual.
   });
 
-  document.getElementById("player-wrap").scrollIntoView({ behavior: "smooth", block: "start" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function buildListItem(file) {
