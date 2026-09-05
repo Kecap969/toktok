@@ -32,14 +32,6 @@ function showStatus(which, detail) {
   }
 }
 
-// Catat IP + info device pengunjung ke Supabase (buat patokan di dashboard
-// admin nanti). Fire-and-forget: gak ditunggu & gak boleh ganggu load video
-// kalau gagal/lambat.
-function logVisit() {
-  if (!SUPABASE_FUNCTIONS_URL || SUPABASE_FUNCTIONS_URL.includes("TEMPEL")) return;
-  fetch(`${SUPABASE_FUNCTIONS_URL}/log-visit`, { method: "POST" }).catch(() => {});
-}
-
 async function fetchVideoList() {
   const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/video-list`);
   const data = await res.json().catch(() => ({}));
@@ -51,10 +43,9 @@ async function fetchVideoList() {
 }
 
 function videoSrc(fileId) {
-  // Langsung ke Google Drive (bukan lewat proxy Supabase lagi), supaya
-  // streaming file besar & Range request (seek) ditangani server Google,
-  // bukan Edge Function yang bisa timeout di tengah streaming.
-  return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(GOOGLE_DRIVE_API_KEY)}`;
+  // Diproxy + di-cache lewat Supabase Edge Function "video-proxy",
+  // bukan langsung ke Google Drive.
+  return `${SUPABASE_FUNCTIONS_URL}/video-proxy?id=${encodeURIComponent(fileId)}`;
 }
 
 // Drive kasih thumbnail kecil (biasanya diakhiri =s220), kita minta ukuran
@@ -162,12 +153,23 @@ function buildItem(file) {
   // <video src> tidak kasih tahu status HTTP di baliknya, jadi saat error kita
   // cek ulang lewat fetch() supaya tahu penyebab sebenarnya: kuota Drive habis
   // (403), file sudah dihapus/tidak publik (404), atau memang jaringan bermasalah.
+  //
+  // PENTING: jangan pakai header custom (mis. Range) di sini. video.src beda
+  // origin (Supabase Edge Function), dan header custom di fetch cross-origin
+  // memicu CORS preflight (OPTIONS). Kalau Edge Function tidak meng-allow
+  // header itu di Access-Control-Allow-Headers, preflight gagal, fetch()
+  // langsung throw, dan diagnosis SELALU jatuh ke "network" walau
+  // penyebab aslinya beda (403/404/dll). AbortController dipakai supaya kita
+  // tetap tidak perlu mengunduh seluruh video hanya untuk baca status-nya.
   async function diagnoseError() {
+    const controller = new AbortController();
     try {
       const res = await fetch(video.src, {
         method: "GET",
-        headers: { Range: "bytes=0-0" },
+        cache: "no-store",
+        signal: controller.signal,
       });
+      controller.abort(); // sudah dapat status/header, hentikan unduhan body-nya
       if (res.status === 403) {
         return { reason: "quota", text: "Kuota unduh Google Drive untuk video ini sudah habis hari ini. Coba lagi beberapa jam lagi." };
       }
@@ -194,7 +196,14 @@ function buildItem(file) {
       const delay = retries === 0 ? 1500 : 3000; // backoff: 1.5s lalu 3s
       setTimeout(() => {
         video.load();
-        video.play().catch(() => {});
+        // Retry ini terjadi di luar user-gesture, jadi browser bisa menolak
+        // play() dengan suara. Kalau ditolak, jatuhkan ke muted supaya video
+        // tetap lanjut jalan (daripada macet diam-diam selamanya).
+        video.play().catch(() => {
+          video.muted = true;
+          updateMuteButton(section, video);
+          video.play().catch(() => {});
+        });
       }, delay);
       return;
     }
@@ -216,7 +225,11 @@ function buildItem(file) {
     errorMsg.classList.add("hidden");
     spinner.classList.add("show");
     video.load();
-    video.play().catch(() => {});
+    video.play().catch(() => {
+      video.muted = true;
+      updateMuteButton(section, video);
+      video.play().catch(() => {});
+    });
   });
 
   function startPlayback() {
@@ -228,6 +241,10 @@ function buildItem(file) {
     progressTrack.classList.remove("hidden");
     audioUnlocked = true;
     video.preload = "auto";
+    // Safari/iOS tidak selalu mendeteksi ubahan `preload` setelah src sudah
+    // di-assign dengan preload="none" — perlu load() eksplisit supaya
+    // buffering benar-benar mulai, kalau tidak video bisa "diam" saat ditap.
+    video.load();
     video.muted = false;
     updateMuteButton(section, video);
     spinner.classList.add("show");
@@ -390,12 +407,6 @@ async function init() {
     showStatus("error", "SUPABASE_FUNCTIONS_URL belum diisi di config.js.");
     return;
   }
-  if (!GOOGLE_DRIVE_API_KEY || GOOGLE_DRIVE_API_KEY.includes("TEMPEL")) {
-    showStatus("error", "GOOGLE_DRIVE_API_KEY belum diisi di config.js (dipakai untuk streaming video langsung dari Drive).");
-    return;
-  }
-
-  logVisit();
 
   showStatus("loading");
   try {
