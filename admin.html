@@ -658,7 +658,7 @@ function stopPolling() {
 
 function schedulePoll(password) {
   stopPolling();
-  pollTimer = setTimeout(() => poll(password), 2500);
+  pollTimer = setTimeout(() => poll(password), 2000);
 }
 
 async function poll(password) {
