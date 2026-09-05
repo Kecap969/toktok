@@ -42,17 +42,26 @@ html, body {
   background: rgba(18, 16, 20, 0.88);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  padding: 16px 18px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 10px;
   border-bottom: 1px solid var(--line);
 }
 
 #logo {
-  height: 40px;
+  height: 26px;
   width: auto;
   display: block;
+}
+
+#brand-name {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--ink);
 }
 
 #app {
