@@ -190,6 +190,48 @@ const VIEWER_SESSION_ID = (function () {
   return id;
 })();
 
+// ---------- Riwayat masuk/keluar pengunjung (untuk halaman admin) ----------
+// Beda dengan heartbeat di atas (yang cuma jalan saat video diputar),
+// log-visit/log-leave mencatat SETIAP pengunjung yang buka halaman ini,
+// diputar atau tidak videonya. Dipakai admin untuk lihat riwayat "siapa
+// masuk jam berapa, keluar jam berapa".
+
+async function logVisit() {
+  try {
+    await fetch(`${SUPABASE_FUNCTIONS_URL}/log-visit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: VIEWER_SESSION_ID }),
+    });
+  } catch {
+    // Gagal sekali tidak masalah, dicoba lagi di ping berikutnya.
+  }
+}
+
+function logLeave() {
+  // sendBeacon dipakai (bukan fetch biasa) supaya tetap terkirim walau tab
+  // langsung ditutup / halaman di-refresh, karena browser tidak akan
+  // membatalkannya seperti request fetch yang sedang berjalan.
+  try {
+    const payload = JSON.stringify({ session_id: VIEWER_SESSION_ID });
+    navigator.sendBeacon(
+      `${SUPABASE_FUNCTIONS_URL}/log-leave`,
+      new Blob([payload], { type: "text/plain;charset=UTF-8" })
+    );
+  } catch {
+    // Kalau sendBeacon tidak tersedia, ya sudah -- waktu keluar tidak tercatat.
+  }
+}
+
+// Catat "masuk" begitu halaman dibuka, lalu ping tiap 10 detik supaya
+// last_seen_at tetap segar selama tab ini masih terbuka (dipakai admin
+// untuk tahu siapa yang "masih online" sekarang).
+logVisit();
+setInterval(logVisit, 10000);
+
+// Catat "keluar" begitu pengunjung menutup tab / pindah situs / refresh.
+window.addEventListener("pagehide", logLeave);
+
 let heartbeatTimer = null;
 let currentFile = null;
 
