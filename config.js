@@ -32,7 +32,7 @@ const SUPABASE_URL = "https://uslfcorrwzekvpyhzyvo.supabase.co";
 // memang didesain untuk dipakai di sisi client, selama Row Level Security
 // tabelnya benar. Ambil di: dashboard Supabase -> Project Settings -> API
 // -> "anon public" key.
-const SUPABASE_ANON_KEY = "TEMPEL_SUPABASE_ANON_KEY_DISINI";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzbGZjb3Jyd3pla3ZweWh6eXZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MTc4NzYsImV4cCI6MjEwNDA5Mzg3Nn0.8VX4lkFdhcDsPUi6XAme57uVkg3KS1oHsIXErtSZCVU";
 
 // API key Google Drive dipakai di BROWSER untuk streaming video langsung.
 // Harus key yang SAMA (atau key baru khusus) dengan referrer restriction
