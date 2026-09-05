@@ -15,7 +15,39 @@
 <main id="app">
 
   <div id="player-wrap">
-    <video id="player" controls playsinline preload="none"></video>
+    <div id="player-stage">
+      <video id="player" playsinline preload="none" disablePictureInPicture controlsList="nodownload noremoteplayback"></video>
+
+      <button id="big-play" aria-label="Putar">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+
+      <div id="controls-bar">
+        <button id="btn-playpause" aria-label="Putar/Jeda">
+          <svg id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="icon-pause" viewBox="0 0 24 24" class="hidden"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+        </button>
+
+        <span id="time-current">0:00</span>
+
+        <div id="seek-track">
+          <div id="seek-fill"></div>
+        </div>
+
+        <span id="time-duration">0:00</span>
+
+        <button id="btn-mute" aria-label="Bisukan/Suarakan">
+          <svg id="icon-unmuted" viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+          <svg id="icon-muted" viewBox="0 0 24 24" class="hidden"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M17 8l4 8m0-8l-4 8" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        </button>
+
+        <button id="btn-fullscreen" aria-label="Layar penuh">
+          <svg id="icon-fs-enter" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+          <svg id="icon-fs-exit" viewBox="0 0 24 24" class="hidden"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        </button>
+      </div>
+    </div>
+
     <div id="player-info">
       <h1 id="player-title">Pilih video di bawah untuk mulai memutar</h1>
     </div>

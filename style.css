@@ -45,11 +45,114 @@ html, body {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
 }
 
+#player-stage {
+  position: relative;
+  background: #000;
+  line-height: 0;
+}
+
 #player {
   display: block;
   width: 100%;
   max-height: 70vh;
   background: #000;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Tombol play besar di tengah, tampil saat video pause/belum mulai */
+#big-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+#big-play svg {
+  width: 28px;
+  height: 28px;
+  fill: var(--paper);
+  margin-left: 3px;
+}
+
+#big-play.hidden {
+  display: none;
+}
+
+/* Bar kontrol custom di bawah video */
+#controls-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.7) 40%);
+}
+
+#controls-bar button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#controls-bar svg {
+  width: 20px;
+  height: 20px;
+  fill: var(--paper);
+}
+
+#time-current, #time-duration {
+  color: var(--paper);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+#seek-track {
+  position: relative;
+  flex: 1;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+#seek-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(246, 245, 241, 0.3);
+}
+
+#seek-fill {
+  position: relative;
+  height: 3px;
+  border-radius: 2px;
+  width: 0%;
+  background: var(--accent);
+  pointer-events: none;
 }
 
 #player-info {

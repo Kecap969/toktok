@@ -24,6 +24,16 @@
 // URL project Supabase Anda (sudah diisi otomatis untuk project "FeedTok")
 const SUPABASE_FUNCTIONS_URL = "https://uslfcorrwzekvpyhzyvo.supabase.co/functions/v1";
 
+// URL dasar project Supabase (tanpa /functions/v1), dipakai untuk kirim
+// "heartbeat" posisi tonton ke tabel viewer_sessions.
+const SUPABASE_URL = "https://uslfcorrwzekvpyhzyvo.supabase.co";
+
+// Anon key Supabase (BUKAN service_role key). Ini AMAN dikirim ke browser —
+// memang didesain untuk dipakai di sisi client, selama Row Level Security
+// tabelnya benar. Ambil di: dashboard Supabase -> Project Settings -> API
+// -> "anon public" key.
+const SUPABASE_ANON_KEY = "TEMPEL_SUPABASE_ANON_KEY_DISINI";
+
 // API key Google Drive dipakai di BROWSER untuk streaming video langsung.
 // Harus key yang SAMA (atau key baru khusus) dengan referrer restriction
 // aktif — jangan pakai key tanpa restriction di sini.
