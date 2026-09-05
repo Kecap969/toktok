@@ -537,7 +537,14 @@ function buildSessionCard(s) {
   video.muted = true;
   video.autoplay = true;
   video.playsInline = true;
-  video.controls = true;
+  // Video preview ini murni tampilan realtime -- admin tidak perlu (dan
+  // tidak boleh) bisa play/pause/seek/volume/fullscreen dari sini, karena
+  // posisinya sepenuhnya mengikuti viewer asli lewat resync otomatis di
+  // updateSessionCard(). Kontrol bawaan browser dimatikan total.
+  video.controls = false;
+  video.disablePictureInPicture = true;
+  video.setAttribute("controlsList", "nodownload noplaybackrate noremoteplayback");
+  video.style.pointerEvents = "none";
   video.preload = "metadata";
   if (s.thumbnail_url) video.poster = s.thumbnail_url;
   video.src = videoSrc(s.video_id);
