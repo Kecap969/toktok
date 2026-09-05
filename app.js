@@ -296,18 +296,48 @@ function playVideo(file, itemEl) {
 function buildListItem(file) {
   const li = document.createElement("li");
 
+  const thumbWrap = document.createElement("div");
+  thumbWrap.className = "thumb-wrap";
+
+  const spinner = document.createElement("div");
+  spinner.className = "thumb-spinner";
+
+  const errorEl = document.createElement("div");
+  errorEl.className = "thumb-error hidden";
+  errorEl.textContent = "Gagal memuat thumbnail";
+
   const thumb = document.createElement("img");
   thumb.className = "thumb";
   thumb.loading = "lazy";
   thumb.decoding = "async";
   thumb.alt = "";
   thumb.draggable = false;
-  if (file.thumbnailLink) thumb.src = thumbnailUrl(file.thumbnailLink);
-  else thumb.classList.add("no-thumb");
+
+  if (file.thumbnailLink) {
+    thumb.src = thumbnailUrl(file.thumbnailLink);
+    // Spinner hilang begitu gambar sukses dimuat...
+    thumb.addEventListener("load", () => {
+      spinner.classList.add("hidden");
+    });
+    // ...atau diganti keterangan error kalau gagal (link mati, folder Drive
+    // belum di-share publik, dll).
+    thumb.addEventListener("error", () => {
+      spinner.classList.add("hidden");
+      thumb.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+    });
+  } else {
+    // Tidak ada thumbnailLink sama sekali dari Google Drive -- bukan error,
+    // cuma memang tidak ada pratinjaunya.
+    spinner.classList.add("hidden");
+    thumb.classList.add("no-thumb");
+  }
+
   thumb.addEventListener("dragstart", (e) => e.preventDefault());
   thumb.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  li.append(thumb);
+  thumbWrap.append(thumb, spinner, errorEl);
+  li.append(thumbWrap);
   li.addEventListener("click", () => playVideo(file, li));
   return li;
 }
