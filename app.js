@@ -307,14 +307,7 @@ function buildListItem(file) {
   thumb.addEventListener("dragstart", (e) => e.preventDefault());
   thumb.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  const info = document.createElement("div");
-  info.className = "item-info";
-  const title = document.createElement("p");
-  title.className = "item-title";
-  title.textContent = prettifyCaption(file.name);
-  info.appendChild(title);
-
-  li.append(thumb, info);
+  li.append(thumb);
   li.addEventListener("click", () => playVideo(file, li));
   return li;
 }
