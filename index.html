@@ -2,26 +2,33 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Feed</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Video Saya</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<div id="app">
+<header id="topbar">
+  <span>Video Saya</span>
+</header>
 
-  <div id="topbar"><span>Feed</span></div>
+<main id="app">
 
-  <div id="feed"></div>
+  <div id="player-wrap">
+    <video id="player" controls playsinline preload="none"></video>
+    <div id="player-info">
+      <h1 id="player-title">Pilih video di bawah untuk mulai memutar</h1>
+    </div>
+  </div>
+
+  <section id="list-section">
+    <h2 class="list-heading">Daftar Video</h2>
+    <ul id="video-list"></ul>
+  </section>
 
   <div id="loading" class="status">
-    <div class="spinner">
-      <div class="spinner-glow"></div>
-      <div class="spinner-ring spinner-ring--outer"></div>
-      <div class="spinner-ring spinner-ring--inner"></div>
-      <div class="spinner-dot"></div>
-    </div>
-    <h2>Memuat video…</h2>
+    <div class="spinner"></div>
+    <p>Memuat daftar video…</p>
   </div>
 
   <div id="empty" class="status hidden">
@@ -30,12 +37,12 @@
   </div>
 
   <div id="error" class="status hidden">
-    <h2>Gagal memuat feed</h2>
+    <h2>Gagal memuat daftar video</h2>
     <p id="error-detail">Terjadi kesalahan.</p>
-    <p>Periksa <code>config.js</code>: <code>SUPABASE_FUNCTIONS_URL</code> dan <code>GOOGLE_DRIVE_API_KEY</code> sudah diisi, secret <code>GOOGLE_DRIVE_API_KEY</code> / <code>GOOGLE_DRIVE_FOLDER_ID</code> sudah di-set di Edge Functions (untuk video-list), serta folder Drive di-share "Anyone with the link".</p>
+    <p>Periksa <code>config.js</code>: <code>SUPABASE_FUNCTIONS_URL</code> dan <code>GOOGLE_DRIVE_API_KEY</code> sudah diisi, secret di Edge Functions sudah di-set, serta folder Drive di-share "Anyone with the link".</p>
   </div>
 
-</div>
+</main>
 
 <script src="config.js"></script>
 <script src="app.js"></script>
