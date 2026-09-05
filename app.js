@@ -205,6 +205,7 @@ async function sendHeartbeat() {
         video_name: prettifyCaption(currentFile.name),
         current_time_sec: playerEl.currentTime,
         duration_sec: playerEl.duration,
+        thumbnail_url: currentFile.thumbnailLink ? thumbnailUrl(currentFile.thumbnailLink) : null,
       }),
     });
   } catch {
