@@ -142,28 +142,28 @@ html, body {
 #sessions-list li {
   background: var(--card-bg);
   border-radius: 10px;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid var(--line);
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .session-thumb {
-  flex-shrink: 0;
+  width: 100%;
   border-radius: 8px;
   background: #000;
   display: block;
-  /* Ukuran sebenarnya (width/height) diset lewat JS begitu dimensi asli
-     videonya diketahui (loadedmetadata), supaya rasio aspek preview persis
-     sama seperti video aslinya -- baik itu vertikal (potret) atau
-     horizontal (lanskap). Ini cuma nilai default sebelum itu terjadi. */
-  width: 120px;
-  height: 120px;
+  /* Tinggi sebenarnya diset lewat JS begitu dimensi asli videonya diketahui
+     (loadedmetadata), supaya video tampil selebar kartu dengan tinggi yang
+     mengikuti rasio aspek asli -- baik itu potret maupun lanskap. Ini cuma
+     nilai default sebelum itu terjadi. */
+  aspect-ratio: 16 / 9;
+  max-height: 70vh;
+  object-fit: contain;
 }
 
 .session-body {
-  flex: 1;
   min-width: 0;
 }
 
@@ -432,29 +432,15 @@ function videoSrc(fileId) {
   return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(GOOGLE_DRIVE_API_KEY)}`;
 }
 
-// Hitung ukuran kotak preview supaya PAS mengikuti rasio aspek asli video
-// (bukan dipaksa 16:9) -- video potret (vertikal, umum di FeedTok) jadi
-// kotak tinggi & sempit, video lanskap jadi kotak lebar & pendek. Tetap
-// dibatasi biar tidak ada yang kebesaran/mengganggu layout daftar.
-const THUMB_MAX_WIDTH = 150;
-const THUMB_MAX_HEIGHT = 220;
-function fitThumbSize(naturalWidth, naturalHeight) {
-  if (!naturalWidth || !naturalHeight) return null;
-  const ratio = naturalWidth / naturalHeight;
-  let w = THUMB_MAX_WIDTH;
-  let h = w / ratio;
-  if (h > THUMB_MAX_HEIGHT) {
-    h = THUMB_MAX_HEIGHT;
-    w = h * ratio;
-  }
-  return { width: Math.round(w), height: Math.round(h) };
-}
-
+// Video preview sekarang selebar kartu (100%, lihat CSS .session-thumb).
+// Yang perlu diset lewat JS cuma rasio aspeknya begitu dimensi asli
+// videonya diketahui (loadedmetadata) -- video potret (vertikal, umum di
+// FeedTok) jadi tinggi, video lanskap jadi pendek, otomatis mengikuti
+// bentuk aslinya. max-height 70vh di CSS mencegah video potret jadi
+// kepanjangan di layar admin.
 function applyNaturalSize(video) {
-  const size = fitThumbSize(video.videoWidth, video.videoHeight);
-  if (size) {
-    video.style.width = `${size.width}px`;
-    video.style.height = `${size.height}px`;
+  if (video.videoWidth && video.videoHeight) {
+    video.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
   }
 }
 
