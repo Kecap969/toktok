@@ -149,16 +149,12 @@ html, body {
 }
 
 .session-thumb {
-  width: 64px;
-  height: 64px;
+  width: 128px;
+  height: 72px;
   flex-shrink: 0;
   border-radius: 8px;
-  background: rgba(14, 15, 17, 0.06);
+  background: #000;
   object-fit: cover;
-}
-
-.session-thumb.no-thumb {
-  background: rgba(14, 15, 17, 0.06);
 }
 
 .session-body {
@@ -276,6 +272,12 @@ function formatTime(seconds) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function videoSrc(fileId) {
+  // Sama seperti di app.js: langsung ke Google Drive, bukan lewat proxy,
+  // supaya Range request (seek) ditangani server Google.
+  return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(GOOGLE_DRIVE_API_KEY)}`;
+}
+
 function timeAgo(isoString) {
   const seconds = Math.max(0, Math.round((Date.now() - new Date(isoString).getTime()) / 1000));
   if (seconds < 2) return "baru saja";
@@ -293,67 +295,122 @@ async function fetchSessions(password) {
   return data.sessions || [];
 }
 
+// Map session_id -> elemen DOM yang sudah dibuat, supaya video preview yang
+// sedang autoplay TIDAK di-reset (dan tidak "loncat"/restart) tiap kali poll
+// setiap 2.5 detik -- cuma teksnya (progress, waktu, timestamp) yang di-update.
+const sessionElements = new Map();
+
+function buildSessionCard(s) {
+  const li = document.createElement("li");
+
+  const video = document.createElement("video");
+  video.className = "session-thumb";
+  video.muted = true;
+  video.autoplay = true;
+  video.playsInline = true;
+  video.controls = true;
+  video.preload = "metadata";
+  if (s.thumbnail_url) video.poster = s.thumbnail_url;
+  video.src = videoSrc(s.video_id);
+  // Begitu durasi videonya diketahui, langsung loncat ke posisi tonton
+  // viewer saat ini, supaya preview-nya mulai dari titik yang relevan.
+  video.addEventListener("loadedmetadata", () => {
+    try {
+      video.currentTime = Number(s.current_time_sec) || 0;
+    } catch {}
+  }, { once: true });
+  video.play().catch(() => {
+    // Browser mungkin tetap menahan autoplay; admin tinggal tap play manual.
+  });
+
+  const body = document.createElement("div");
+  body.className = "session-body";
+
+  const header = document.createElement("div");
+  header.className = "session-header";
+  const name = document.createElement("span");
+  name.className = "session-video-name";
+  const updated = document.createElement("span");
+  updated.className = "session-updated";
+  header.append(name, updated);
+
+  const track = document.createElement("div");
+  track.className = "session-progress-track";
+  const fill = document.createElement("div");
+  fill.className = "session-progress-fill";
+  track.appendChild(fill);
+
+  const time = document.createElement("div");
+  time.className = "session-time";
+
+  const viewer = document.createElement("div");
+  viewer.className = "session-viewer";
+  const ip = document.createElement("span");
+  ip.className = "ip";
+  const dot = document.createElement("span");
+  dot.className = "dot";
+  dot.textContent = "•";
+  const device = document.createElement("span");
+  viewer.append(ip, dot, device);
+
+  body.append(header, track, time, viewer);
+  li.append(video, body);
+
+  return { li, video, videoId: s.video_id, name, updated, fill, time, ip, device };
+}
+
+function updateSessionCard(entry, s) {
+  entry.name.textContent = s.video_name;
+  entry.updated.textContent = timeAgo(s.updated_at);
+  const pct = s.duration_sec ? Math.min(100, (s.current_time_sec / s.duration_sec) * 100) : 0;
+  entry.fill.style.width = `${pct}%`;
+  entry.time.textContent = `${formatTime(s.current_time_sec)} / ${formatTime(s.duration_sec)}`;
+  entry.ip.textContent = s.ip_address || "IP tidak diketahui";
+  entry.device.textContent = [s.device_type, s.os, s.browser].filter(Boolean).join(" · ") || "Device tidak diketahui";
+
+  // Kalau viewer ganti video, baru ganti src (dan seek ulang). Kalau videonya
+  // masih sama, JANGAN sentuh video.src sama sekali -- itu yang bikin
+  // playback restart tiap poll sebelumnya.
+  if (entry.videoId !== s.video_id) {
+    entry.videoId = s.video_id;
+    if (s.thumbnail_url) entry.video.poster = s.thumbnail_url;
+    entry.video.src = videoSrc(s.video_id);
+    entry.video.addEventListener("loadedmetadata", () => {
+      try {
+        entry.video.currentTime = Number(s.current_time_sec) || 0;
+      } catch {}
+    }, { once: true });
+    entry.video.play().catch(() => {});
+  }
+}
+
 function renderSessions(sessions) {
-  sessionsList.innerHTML = "";
   emptyState.classList.toggle("hidden", sessions.length > 0);
 
+  const seen = new Set();
   sessions.forEach((s) => {
-    const li = document.createElement("li");
-
-    const thumb = document.createElement("img");
-    thumb.className = "session-thumb";
-    thumb.loading = "lazy";
-    thumb.alt = "";
-    if (s.thumbnail_url) {
-      thumb.src = s.thumbnail_url;
-    } else {
-      thumb.classList.add("no-thumb");
+    seen.add(s.session_id);
+    let entry = sessionElements.get(s.session_id);
+    if (!entry) {
+      entry = buildSessionCard(s);
+      sessionElements.set(s.session_id, entry);
     }
-
-    const body = document.createElement("div");
-    body.className = "session-body";
-
-    const header = document.createElement("div");
-    header.className = "session-header";
-
-    const name = document.createElement("span");
-    name.className = "session-video-name";
-    name.textContent = s.video_name;
-
-    const updated = document.createElement("span");
-    updated.className = "session-updated";
-    updated.textContent = timeAgo(s.updated_at);
-
-    header.append(name, updated);
-
-    const track = document.createElement("div");
-    track.className = "session-progress-track";
-    const fill = document.createElement("div");
-    fill.className = "session-progress-fill";
-    const pct = s.duration_sec ? Math.min(100, (s.current_time_sec / s.duration_sec) * 100) : 0;
-    fill.style.width = `${pct}%`;
-    track.appendChild(fill);
-
-    const time = document.createElement("div");
-    time.className = "session-time";
-    time.textContent = `${formatTime(s.current_time_sec)} / ${formatTime(s.duration_sec)}`;
-
-    const viewer = document.createElement("div");
-    viewer.className = "session-viewer";
-    const ip = document.createElement("span");
-    ip.className = "ip";
-    ip.textContent = s.ip_address || "IP tidak diketahui";
-    const dot = document.createElement("span");
-    dot.className = "dot";
-    dot.textContent = "•";
-    const device = document.createElement("span");
-    device.textContent = [s.device_type, s.os, s.browser].filter(Boolean).join(" · ") || "Device tidak diketahui";
-    viewer.append(ip, dot, device);
-
-    body.append(header, track, time, viewer);
-    li.append(thumb, body);
-    sessionsList.appendChild(li);
+    updateSessionCard(entry, s);
+    // appendChild pada node yang sudah ada di DOM cuma memindah posisinya
+    // (tidak membuat ulang elemen), jadi video yang sedang main tidak keputus.
+    sessionsList.appendChild(entry.li);
   });
+
+  // Viewer yang sudah berhenti nonton (heartbeat-nya berhenti) -> lepas dari DOM.
+  for (const [sessionId, entry] of sessionElements) {
+    if (!seen.has(sessionId)) {
+      entry.video.pause();
+      entry.video.removeAttribute("src");
+      entry.video.load();
+      entry.li.remove();
+      sessionElements.delete(sessionId);
+    }
+  }
 }
 
 function stopPolling() {
@@ -386,6 +443,15 @@ function showDashboard(password) {
 
 function showLogin(errorMessage) {
   stopPolling();
+  // Hentikan semua video preview yang sedang autoplay supaya tidak terus
+  // jalan di background dan makan bandwidth setelah admin keluar.
+  for (const entry of sessionElements.values()) {
+    entry.video.pause();
+    entry.video.removeAttribute("src");
+    entry.video.load();
+  }
+  sessionElements.clear();
+  sessionsList.innerHTML = "";
   dashboard.classList.add("hidden");
   loginScreen.classList.remove("hidden");
   passwordInput.value = "";
