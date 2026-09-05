@@ -22,6 +22,9 @@ const iconFsEnter = document.getElementById("icon-fs-enter");
 const iconFsExit = document.getElementById("icon-fs-exit");
 const playerStage = document.getElementById("player-stage");
 const playerLoadingEl = document.getElementById("player-loading");
+const playerErrorEl = document.getElementById("player-error");
+const playerErrorTextEl = document.getElementById("player-error-text");
+const playerErrorRetryBtn = document.getElementById("player-error-retry");
 
 function showStatus(which, detail) {
   loadingEl.classList.add("hidden");
@@ -109,6 +112,62 @@ function showPlayerLoading() {
 
 function hidePlayerLoading() {
   if (playerLoadingEl) playerLoadingEl.classList.add("hidden");
+}
+
+function showPlayerError(message) {
+  hidePlayerLoading();
+  if (playerErrorTextEl) playerErrorTextEl.textContent = message;
+  if (playerErrorEl) playerErrorEl.classList.remove("hidden");
+}
+
+function hidePlayerError() {
+  if (playerErrorEl) playerErrorEl.classList.add("hidden");
+}
+
+// Elemen <video> sendiri tidak memberi tahu kode status HTTP saat gagal
+// (cuma kode error generik seperti "network" atau "decode"). Supaya pesan
+// ke pengguna bisa lebih spesifik, begitu <video> gagal kita coba tebak
+// penyebabnya dengan request kecil (cuma 1 byte lewat header Range) ke URL
+// yang sama persis, lalu baca status HTTP dari situ.
+async function diagnosePlaybackError(src) {
+  try {
+    const res = await fetch(src, { headers: { Range: "bytes=0-0" } });
+    if (res.status === 403) {
+      return "Video ini belum bisa diputar sekarang — kemungkinan kuota harian Google Drive untuk file ini sudah habis, atau izin file belum diatur \"Anyone with the link\". Biasanya pulih otomatis dalam 24 jam.";
+    }
+    if (res.status === 429) {
+      return "Terlalu banyak yang menonton video ini secara bersamaan. Coba lagi dalam beberapa menit.";
+    }
+    if (res.status === 404) {
+      return "Video tidak ditemukan. Kemungkinan file sudah dihapus atau dipindahkan dari Google Drive.";
+    }
+    if (!res.ok) {
+      return `Video gagal dimuat (kode ${res.status}). Coba lagi nanti.`;
+    }
+    return "Video gagal diputar. Coba lagi, atau periksa koneksi internet Anda.";
+  } catch {
+    return "Tidak bisa terhubung ke server video. Periksa koneksi internet Anda.";
+  }
+}
+
+playerEl.addEventListener("error", async () => {
+  const src = playerEl.currentSrc || playerEl.src;
+  if (!src) return;
+  const message = await diagnosePlaybackError(src);
+  showPlayerError(message);
+});
+
+playerEl.addEventListener("playing", hidePlayerError);
+
+if (playerErrorRetryBtn) {
+  playerErrorRetryBtn.addEventListener("click", () => {
+    if (!currentFile) return;
+    hidePlayerError();
+    showPlayerLoading();
+    playerEl.src = videoSrc(currentFile.id);
+    playerEl.load();
+    playerEl.play().catch(() => {});
+  });
 }
 
 // Spinner muncul selama video dimuat/buffering, dan hilang begitu video
@@ -300,6 +359,7 @@ function playVideo(file, itemEl) {
   document.querySelectorAll("#video-list li.active").forEach((li) => li.classList.remove("active"));
   itemEl.classList.add("active");
 
+  hidePlayerError();
   currentFile = file;
   playerEl.src = videoSrc(file.id);
   playerTitleEl.textContent = prettifyCaption(file.name);
