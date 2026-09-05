@@ -223,14 +223,20 @@ function logLeave() {
   }
 }
 
-// Catat "masuk" begitu halaman dibuka, lalu ping tiap 10 detik supaya
+// Catat "masuk" begitu halaman dibuka, lalu ping tiap 5 detik supaya
 // last_seen_at tetap segar selama tab ini masih terbuka (dipakai admin
-// untuk tahu siapa yang "masih online" sekarang).
+// untuk tahu siapa yang "masih online" sekarang, lebih realtime).
 logVisit();
-setInterval(logVisit, 10000);
+setInterval(logVisit, 5000);
 
 // Catat "keluar" begitu pengunjung menutup tab / pindah situs / refresh.
+// Dua event dipasang sebagai jaring pengaman satu sama lain: pagehide
+// paling diandalkan (termasuk di banyak browser mobile saat app di-switch/
+// ditutup), beforeunload sebagai cadangan di browser desktop lama yang
+// tidak konsisten memicu pagehide. Memanggil logLeave() dua kali tidak
+// masalah -- log-leave cuma menimpa left_at dengan waktu yang hampir sama.
 window.addEventListener("pagehide", logLeave);
+window.addEventListener("beforeunload", logLeave);
 
 let heartbeatTimer = null;
 let currentFile = null;
