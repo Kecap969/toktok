@@ -99,6 +99,18 @@
 
 </main>
 
+<!-- Overlay ini SENGAJA di luar #main dan pakai position:fixed (lihat
+     style.css) supaya menutupi seluruh halaman begitu internet mati, tapi
+     halaman itu sendiri TIDAK di-reload/ditutup -- cuma disembunyikan lagi
+     otomatis begitu event "online" browser terdeteksi (lihat app.js). -->
+<div id="offline-overlay" class="hidden" role="alert" aria-live="assertive">
+  <div id="offline-box">
+    <div class="spinner"></div>
+    <h2>Tidak ada koneksi internet</h2>
+    <p>Sambungan internet kamu terputus. Halaman ini tidak perlu dibuka ulang &mdash; begitu internet nyala lagi, tampilan ini akan hilang sendiri dan video bisa dilanjutkan.</p>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

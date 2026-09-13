@@ -466,3 +466,57 @@ async function init() {
 }
 
 init();
+
+// ---------- Deteksi offline/online ----------
+// Tujuannya: kalau internet mati di tengah jalan, halaman JANGAN error/blank
+// atau perlu ditutup -- cukup tampilkan overlay "offline", lalu begitu
+// internet nyala lagi overlay hilang sendiri dan halaman lanjut seperti
+// biasa (video, daftar, heartbeat, dst tetap di state yang sama karena
+// halaman tidak pernah di-reload).
+
+const offlineOverlay = document.getElementById("offline-overlay");
+let wasPlayingBeforeOffline = false;
+
+function showOfflineOverlay() {
+  if (!offlineOverlay) return;
+  offlineOverlay.classList.remove("hidden");
+  // Jeda video sementara offline -- daripada dibiarkan buffering sia-sia
+  // (dan browser nampilin error) sampai koneksi balik. Status "sedang main
+  // sebelum offline" disimpan supaya bisa dilanjut otomatis nanti.
+  wasPlayingBeforeOffline = !playerEl.paused && !playerEl.ended;
+  if (wasPlayingBeforeOffline) playerEl.pause();
+}
+
+function hideOfflineOverlay() {
+  if (!offlineOverlay) return;
+  offlineOverlay.classList.add("hidden");
+
+  // Kalau daftar video BELUM PERNAH berhasil dimuat (mis. halaman dibuka
+  // saat memang lagi offline), coba lagi sekarang -- tanpa perlu pengguna
+  // refresh manual.
+  if (listEl.children.length === 0 && !currentFile) {
+    init();
+    return;
+  }
+
+  // Kalau tadinya lagi muter video, lanjutkan otomatis dari posisi yang sama.
+  if (wasPlayingBeforeOffline) {
+    playerEl.play().catch(() => {
+      // Kalau browser tetap menahan (mis. kebijakan autoplay), tombol play
+      // besar tetap ada untuk user tap manual.
+    });
+  }
+
+  // Kabari server lagi begitu online (heartbeat/log-visit yang gagal
+  // sepanjang offline otomatis akan jalan lagi lewat interval yang sudah
+  // ada, tapi ini bikin admin lihat kita "online" secepatnya tanpa nunggu
+  // interval berikutnya).
+  logVisit();
+}
+
+window.addEventListener("offline", showOfflineOverlay);
+window.addEventListener("online", hideOfflineOverlay);
+
+// Cek begitu skrip ini pertama jalan, siapa tahu halaman dibuka dalam
+// keadaan sudah offline dari awal.
+if (!navigator.onLine) showOfflineOverlay();
