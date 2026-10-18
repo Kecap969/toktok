@@ -1,5 +1,5 @@
 // ============================================
-// KONFIGURASI
+// KONFIGURASIii
 // ============================================
 //
 // Daftar video (video-list), heartbeat viewer (viewer-heartbeat), dan data
