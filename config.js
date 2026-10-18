@@ -29,7 +29,7 @@ const SUPABASE_FUNCTIONS_URL = "https://uslfcorrwzekvpyhzyvo.supabase.co/functio
 // API key Google Drive dipakai di BROWSER untuk streaming video langsung.
 // Harus key yang SAMA (atau key baru khusus) dengan referrer restriction
 // aktif — jangan pakai key tanpa restriction di sini.
-const GOOGLE_DRIVE_API_KEY = "AIzaSyBxmHrrGOA_TseA3OtthWtXkjsda_vVtfQ";
+const GOOGLE_DRIVE_API_KEY = "AIzaSyB8MY-5lLPOirCFvXO8qEwHgY5zntv0m4c";
 
 // Nama tampilan default untuk uploader
 const DEFAULT_USERNAME = "@feed";
