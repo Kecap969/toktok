@@ -412,22 +412,33 @@ function buildListItem(file) {
     // thumbnail sudah dihapus dari R2, dll).
     thumb.addEventListener("error", () => {
       spinner.classList.add("hidden");
-      thumb.classList.add("hidden");
-      errorEl.classList.remove("hidden");
+      thumbWrap.classList.add("no-thumb");
     });
   } else {
     // Video ini tidak punya thumbnail (mis. ditambahkan lewat link URL) --
     // bukan error, cuma memang tidak ada pratinjaunya.
     spinner.classList.add("hidden");
     thumb.classList.add("no-thumb");
+    thumbWrap.classList.add("no-thumb");
   }
 
   thumb.addEventListener("dragstart", (e) => e.preventDefault());
   thumb.addEventListener("contextmenu", (e) => e.preventDefault());
 
   thumbWrap.append(thumb, spinner, errorEl);
-  li.append(thumbWrap);
+  const cap = document.createElement("div");
+  cap.className = "card-title";
+  cap.textContent = prettifyCaption(file.name);
+  li.append(thumbWrap, cap);
+  li.tabIndex = 0;
+  li.setAttribute("role", "button");
   li.addEventListener("click", () => playVideo(file, li));
+  li.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      playVideo(file, li);
+    }
+  });
   return li;
 }
 
@@ -449,6 +460,8 @@ async function init() {
     const fragment = document.createDocumentFragment();
     files.forEach((f) => fragment.appendChild(buildListItem(f)));
     listEl.appendChild(fragment);
+    const countEl = document.getElementById("video-count");
+    if (countEl) countEl.textContent = files.length;
 
     // Muat video pertama ke player (tanpa autoplay) supaya pengguna
     // langsung lihat sesuatu di area player.
