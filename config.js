@@ -1,35 +1,27 @@
 // ============================================
-// KONFIGURASIii
+// KONFIGURASI
 // ============================================
 //
-// Daftar video (video-list), heartbeat viewer (viewer-heartbeat), dan data
-// admin (admin-sessions) semua lewat Supabase Edge Function — bukan lewat
-// REST API Supabase langsung dari browser. Karena itu browser tidak perlu
-// (dan tidak diberi) anon key Supabase sama sekali di file ini.
+// Daftar video (video-list), heartbeat viewer (viewer-heartbeat), data admin
+// (admin-sessions) dan manajemen video (admin-videos) semua lewat Supabase
+// Edge Function -- bukan lewat REST API Supabase langsung dari browser.
+// Karena itu browser tidak perlu (dan tidak diberi) anon key Supabase.
 //
-// Video ITU SENDIRI di-stream LANGSUNG dari Google Drive (bukan lewat
-// proxy), supaya tidak kena batas waktu/streaming Edge Function untuk file
-// besar. Konsekuensinya: GOOGLE_DRIVE_API_KEY di bawah ini ikut terkirim ke
-// browser (bisa dilihat lewat DevTools).
+// Video di-stream LANGSUNG dari Cloudflare R2 lewat URL publiknya (disimpan
+// di tabel "videos" di Supabase). Tidak ada API key apa pun di browser.
 //
-// WAJIB: batasi key ini di Google Cloud Console -> Credentials -> key ini
-// -> "Application restrictions" -> HTTP referrers -> isi domain situs Anda
-// (mis. https://domain-anda.com/*), supaya key tidak bisa dipakai dari luar.
-//
-// Sisi server (Supabase Edge Function secrets) yang masih perlu diisi manual
-// untuk function video-list:
-//   GOOGLE_DRIVE_API_KEY   -> API key dari Google Cloud Console
-//   GOOGLE_DRIVE_FOLDER_ID -> ID folder Drive
+// Secret yang perlu di-set di sisi server (Supabase Edge Functions):
+//   ADMIN_PASSWORD         -> password admin (samakan dengan yang sudah dipakai)
+//   R2_ACCOUNT_ID          -> Account ID Cloudflare
+//   R2_ACCESS_KEY_ID       -> R2 API token (Object Read & Write)
+//   R2_SECRET_ACCESS_KEY   -> pasangan dari access key di atas
+//   R2_BUCKET              -> nama bucket R2
+//   R2_PUBLIC_BASE_URL     -> URL publik bucket, mis. https://pub-xxxx.r2.dev
+//                             atau https://video.domain-anda.com (tanpa "/" di akhir)
 // Cara set: dashboard Supabase -> Project Settings -> Edge Functions -> Secrets
-// atau CLI: supabase secrets set GOOGLE_DRIVE_API_KEY=xxx GOOGLE_DRIVE_FOLDER_ID=xxx
 
 // URL project Supabase Anda (sudah diisi otomatis untuk project "FeedTok")
 const SUPABASE_FUNCTIONS_URL = "https://uslfcorrwzekvpyhzyvo.supabase.co/functions/v1";
-
-// API key Google Drive dipakai di BROWSER untuk streaming video langsung.
-// Harus key yang SAMA (atau key baru khusus) dengan referrer restriction
-// aktif — jangan pakai key tanpa restriction di sini.
-const GOOGLE_DRIVE_API_KEY = "AIzaSyB8MY-5lLPOirCFvXO8qEwHgY5zntv0m4c";
 
 // Nama tampilan default untuk uploader
 const DEFAULT_USERNAME = "@feed";

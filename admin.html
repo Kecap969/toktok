@@ -459,6 +459,198 @@ html, body {
   color: var(--muted-strong);
 }
 
+/* ---------- Kelola Video ---------- */
+
+.tab-btn {
+  line-height: 1.25;
+}
+
+.m-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.m-card h2,
+.m-heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.m-heading {
+  margin: 22px 2px 10px;
+}
+
+.m-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.m-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.m-input::placeholder {
+  color: var(--muted);
+}
+
+.m-input::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--card-hover);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.m-btn {
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.m-btn:hover {
+  background: var(--accent-bright);
+}
+
+.m-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.m-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.m-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+#m-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.15s linear;
+}
+
+#m-status {
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--muted-strong);
+}
+
+#m-status.error {
+  color: var(--accent-bright);
+}
+
+#m-empty {
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+#m-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#m-list li {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.m-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 7px;
+  background: #000;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.m-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.m-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-url {
+  margin-top: 3px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-delete {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.m-delete:hover {
+  background: var(--accent-wash);
+}
+
+.m-delete:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ---------- Accessibility ---------- */
 
 button:focus-visible,
@@ -495,6 +687,7 @@ input:focus-visible {
   <nav id="tabs">
     <button class="tab-btn active" id="tab-live" type="button">Sedang Ditonton</button>
     <button class="tab-btn" id="tab-history" type="button">Riwayat Masuk/Keluar</button>
+    <button class="tab-btn" id="tab-manage" type="button">Kelola Video</button>
   </nav>
 
   <main id="sessions-wrap">
@@ -513,6 +706,38 @@ input:focus-visible {
         <p>Belum ada riwayat kunjungan.</p>
       </div>
       <ul id="history-list"></ul>
+    </div>
+
+    <div id="manage-view" class="hidden">
+      <section class="m-card">
+        <h2>Sinkronkan dari bucket R2</h2>
+        <button class="m-btn" id="m-sync-btn" type="button">Sinkronkan dari R2</button>
+        <p class="m-hint" id="m-sync-status">Membaca isi bucket lewat S3 API: video yang ada di R2 tapi belum tampil di situs ditambahkan otomatis (judul dari nama file, tanpa thumbnail). Entri yang filenya sudah tidak ada di R2 ikut dibersihkan dari daftar.</p>
+      </section>
+
+      <section class="m-card">
+        <h2>Upload video ke Cloudflare R2</h2>
+        <input class="m-input" type="file" id="m-file" accept="video/*" />
+        <input class="m-input" type="text" id="m-title" placeholder="Judul video" maxlength="200" />
+        <button class="m-btn" id="m-upload-btn" type="button">Upload</button>
+        <div id="m-progress" class="hidden">
+          <div class="m-track"><div id="m-fill"></div></div>
+          <div id="m-status"></div>
+        </div>
+        <p class="m-hint">Thumbnail dibuat otomatis dari detik pertama video. Jangan tutup halaman ini selama upload berjalan.</p>
+      </section>
+
+      <section class="m-card">
+        <h2>Atau tempel link URL video</h2>
+        <input class="m-input" type="url" id="m-url" placeholder="https://pub-xxxx.r2.dev/video.mp4" />
+        <input class="m-input" type="text" id="m-url-title" placeholder="Judul video" maxlength="200" />
+        <button class="m-btn" id="m-url-btn" type="button">Tambah</button>
+        <p class="m-hint">Untuk video yang sudah ada di R2 (atau link langsung .mp4 lain). Video dari link ini tidak punya thumbnail, dan file aslinya tidak ikut terhapus saat Anda menghapusnya dari daftar.</p>
+      </section>
+
+      <h2 class="m-heading">Video di Situs</h2>
+      <div id="m-empty" class="hidden">Belum ada video.</div>
+      <ul id="m-list"></ul>
     </div>
   </main>
 </div>
@@ -536,10 +761,36 @@ const historyEmpty = document.getElementById("history-empty");
 
 const clearHistoryBtn = document.getElementById("clear-history-btn");
 
+const tabManage = document.getElementById("tab-manage");
+const manageView = document.getElementById("manage-view");
+const mFile = document.getElementById("m-file");
+const mTitle = document.getElementById("m-title");
+const mUploadBtn = document.getElementById("m-upload-btn");
+const mProgress = document.getElementById("m-progress");
+const mFill = document.getElementById("m-fill");
+const mStatus = document.getElementById("m-status");
+const mUrl = document.getElementById("m-url");
+const mUrlTitle = document.getElementById("m-url-title");
+const mUrlBtn = document.getElementById("m-url-btn");
+const mList = document.getElementById("m-list");
+const mEmpty = document.getElementById("m-empty");
+const mSyncBtn = document.getElementById("m-sync-btn");
+const mSyncStatus = document.getElementById("m-sync-status");
+
+// Batas satu kali PUT ke R2 (S3-compatible) = 5 GB.
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
+
 const PASSWORD_STORAGE_KEY = "admin:password";
 let pollTimer = null;
 let lastHistory = [];
 let currentPassword = null;
+
+// Peta id video -> {id, name, url, thumbnailLink}, diambil dari video-list
+// (publik). Dipakai preview "Sedang Ditonton" untuk mencari URL R2 dari
+// video_id yang dikirim heartbeat viewer, dan untuk tab "Kelola Video".
+let videoMap = new Map();
+let videoListCache = [];
+let lastVideoFetchAt = 0;
 
 function formatTime(seconds) {
   if (!isFinite(seconds) || seconds < 0) seconds = 0;
@@ -548,10 +799,46 @@ function formatTime(seconds) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function videoSrc(fileId) {
-  // Sama seperti di app.js: langsung ke Google Drive, bukan lewat proxy,
-  // supaya Range request (seek) ditangani server Google.
-  return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(GOOGLE_DRIVE_API_KEY)}`;
+function videoSrc(videoId) {
+  // URL publik R2 dari video_id (lihat videoMap). String kosong kalau
+  // videonya sudah dihapus admin / belum ada di daftar.
+  const f = videoMap.get(videoId);
+  return f ? f.url : "";
+}
+
+async function refreshVideos(force) {
+  // Dibatasi 1x per 10 detik (kecuali force) supaya poll admin tidak
+  // membanjiri video-list kalau ada viewer yang menonton video yang sudah dihapus.
+  if (!force && Date.now() - lastVideoFetchAt < 10000) return;
+  lastVideoFetchAt = Date.now();
+  try {
+    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/video-list`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return;
+    videoListCache = data.files || [];
+    videoMap = new Map(videoListCache.map((f) => [f.id, f]));
+    renderManageList();
+  } catch {
+    // Gagal sekali tidak masalah, dicoba lagi di poll berikutnya.
+  }
+}
+
+// Pasang sumber video preview dari video_id viewer, lalu loncat ke posisi
+// tonton viewer begitu metadata siap. Return false kalau URL tidak ketemu.
+function attachPreviewSource(video, s) {
+  const url = videoSrc(s.video_id);
+  if (!url) return false;
+  video.src = url;
+  video.addEventListener("loadedmetadata", () => {
+    try {
+      video.currentTime = Number(s.current_time_sec) || 0;
+    } catch {}
+    applyNaturalSize(video);
+  }, { once: true });
+  video.play().catch(() => {
+    // Browser mungkin tetap menahan autoplay; admin tinggal tap play manual.
+  });
+  return true;
 }
 
 // Video preview sekarang selebar kartu (100%, lihat CSS .session-thumb).
@@ -635,16 +922,19 @@ function renderHistory(history) {
 }
 
 function setActiveTab(tab) {
-  const isLive = tab === "live";
-  tabLive.classList.toggle("active", isLive);
-  tabHistory.classList.toggle("active", !isLive);
-  liveView.classList.toggle("hidden", !isLive);
-  historyView.classList.toggle("hidden", isLive);
-  if (!isLive) renderHistory(lastHistory);
+  tabLive.classList.toggle("active", tab === "live");
+  tabHistory.classList.toggle("active", tab === "history");
+  tabManage.classList.toggle("active", tab === "manage");
+  liveView.classList.toggle("hidden", tab !== "live");
+  historyView.classList.toggle("hidden", tab !== "history");
+  manageView.classList.toggle("hidden", tab !== "manage");
+  if (tab === "history") renderHistory(lastHistory);
+  if (tab === "manage") refreshVideos(true);
 }
 
 tabLive.addEventListener("click", () => setActiveTab("live"));
 tabHistory.addEventListener("click", () => setActiveTab("history"));
+tabManage.addEventListener("click", () => setActiveTab("manage"));
 
 // Map session_id -> elemen DOM yang sudah dibuat, supaya video preview yang
 // sedang autoplay TIDAK di-reset (dan tidak "loncat"/restart) tiap kali poll
@@ -669,19 +959,10 @@ function buildSessionCard(s) {
   video.style.pointerEvents = "none";
   video.preload = "metadata";
   if (s.thumbnail_url) video.poster = s.thumbnail_url;
-  video.src = videoSrc(s.video_id);
   // Begitu durasi & dimensi videonya diketahui: loncat ke posisi tonton
   // viewer saat ini, dan sesuaikan ukuran kotak preview dengan rasio aspek
-  // asli videonya (bisa potret atau lanskap).
-  video.addEventListener("loadedmetadata", () => {
-    try {
-      video.currentTime = Number(s.current_time_sec) || 0;
-    } catch {}
-    applyNaturalSize(video);
-  }, { once: true });
-  video.play().catch(() => {
-    // Browser mungkin tetap menahan autoplay; admin tinggal tap play manual.
-  });
+  // asli videonya (bisa potret atau lanskap). Lihat attachPreviewSource().
+  attachPreviewSource(video, s);
 
   const body = document.createElement("div");
   body.className = "session-body";
@@ -742,16 +1023,16 @@ function updateSessionCard(entry, s) {
     entry.stalledSinceAt = null;
     entry.updated.textContent = timeAgo(s.updated_at);
     if (s.thumbnail_url) entry.video.poster = s.thumbnail_url;
-    entry.video.src = videoSrc(s.video_id);
-    entry.video.addEventListener("loadedmetadata", () => {
-      try {
-        entry.video.currentTime = Number(s.current_time_sec) || 0;
-      } catch {}
-      applyNaturalSize(entry.video);
-    }, { once: true });
-    entry.video.play().catch(() => {});
+    if (!attachPreviewSource(entry.video, s)) {
+      entry.video.removeAttribute("src");
+      entry.video.load();
+    }
     return;
   }
+
+  // Kartu dibuat saat daftar video belum termuat / videonya baru saja
+  // ditambahkan -> pasang sumbernya begitu URL-nya sudah diketahui.
+  if (!entry.video.getAttribute("src")) attachPreviewSource(entry.video, s);
 
   // Deteksi viewer sedang pause: posisi tonton dari server (current_time_sec)
   // berhenti maju. Heartbeat pengguna cuma update tiap 4 detik sementara
@@ -840,6 +1121,7 @@ async function poll(password) {
   currentPassword = password;
   try {
     const { sessions, history } = await fetchSessions(password);
+    if (sessions.some((x) => !videoMap.has(x.video_id))) await refreshVideos(false);
     renderSessions(sessions);
     lastHistory = history;
     if (!historyView.classList.contains("hidden")) renderHistory(history);
@@ -880,6 +1162,250 @@ async function clearHistory() {
 }
 
 clearHistoryBtn.addEventListener("click", clearHistory);
+
+// ---------- Kelola Video (upload ke Cloudflare R2) ----------
+// Alur upload:
+//   1. Minta URL upload sementara ke Edge Function "admin-videos" (presign).
+//   2. Browser meng-upload file LANGSUNG ke R2 lewat URL itu (tidak lewat
+//      Supabase, jadi tidak kena batas ukuran/waktu Edge Function).
+//   3. Simpan judul + URL publik ke tabel "videos" (action "add").
+// Kunci rahasia R2 hanya ada di server -- browser cuma dapat URL sekali pakai.
+
+async function adminVideosApi(payload) {
+  const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/admin-videos`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-password": currentPassword || "",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function putToR2(url, blob, contentType, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", contentType);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload ke R2 gagal (HTTP ${xhr.status}).`));
+    };
+    xhr.onerror = () => reject(new Error("Upload ke R2 gagal. Cek pengaturan CORS bucket R2 dan koneksi internet."));
+    xhr.send(blob);
+  });
+}
+
+// Ambil satu frame dari file video lokal (di browser admin) jadi JPEG kecil.
+// Mengembalikan null kalau gagal -- thumbnail itu opsional, upload tetap lanjut.
+function captureThumbnail(file) {
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+
+    let finished = false;
+    const finish = (blob) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      URL.revokeObjectURL(objectUrl);
+      v.removeAttribute("src");
+      v.load();
+      resolve(blob);
+    };
+    const timer = setTimeout(() => finish(null), 10000);
+
+    v.addEventListener("error", () => finish(null));
+    v.addEventListener("loadedmetadata", () => {
+      v.currentTime = Math.min(1, (v.duration || 1) / 2);
+    });
+    v.addEventListener("seeked", () => {
+      try {
+        const maxSide = 480;
+        const scale = Math.min(1, maxSide / Math.max(v.videoWidth, v.videoHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(v.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(v.videoHeight * scale));
+        canvas.getContext("2d").drawImage(v, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((b) => finish(b), "image/jpeg", 0.8);
+      } catch {
+        finish(null);
+      }
+    });
+    v.src = objectUrl;
+  });
+}
+
+function setUploadStatus(text, pct, isError) {
+  mProgress.classList.remove("hidden");
+  mStatus.textContent = text;
+  mStatus.classList.toggle("error", !!isError);
+  if (typeof pct === "number") mFill.style.width = `${Math.round(pct * 100)}%`;
+}
+
+mFile.addEventListener("change", () => {
+  const f = mFile.files[0];
+  if (f && !mTitle.value.trim()) mTitle.value = f.name.replace(/\.[^/.]+$/, "");
+});
+
+async function uploadVideo() {
+  const file = mFile.files[0];
+  if (!file) {
+    setUploadStatus("Pilih file video dulu.", 0, true);
+    return;
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    setUploadStatus("File lebih dari 5 GB, terlalu besar untuk satu kali upload.", 0, true);
+    return;
+  }
+  const title = mTitle.value.trim() || file.name.replace(/\.[^/.]+$/, "");
+
+  mUploadBtn.disabled = true;
+  mFile.disabled = true;
+  try {
+    setUploadStatus("Membuat thumbnail…", 0);
+    const thumbBlob = await captureThumbnail(file);
+
+    setUploadStatus("Menyiapkan upload…", 0);
+    const contentType = file.type || "video/mp4";
+    const { upload_url, key } = await adminVideosApi({
+      action: "presign",
+      kind: "video",
+      content_type: contentType,
+    });
+
+    await putToR2(upload_url, file, contentType, (p) => {
+      setUploadStatus(`Mengupload… ${Math.round(p * 100)}%`, p * 0.95);
+    });
+
+    let thumbKey = null;
+    if (thumbBlob) {
+      setUploadStatus("Mengupload thumbnail…", 0.97);
+      try {
+        const t = await adminVideosApi({ action: "presign", kind: "thumb", content_type: "image/jpeg" });
+        await putToR2(t.upload_url, thumbBlob, "image/jpeg");
+        thumbKey = t.key;
+      } catch {
+        // Thumbnail gagal bukan masalah besar -- video tetap ditambahkan.
+      }
+    }
+
+    setUploadStatus("Menyimpan ke daftar…", 0.99);
+    await adminVideosApi({ action: "add", title, key, thumb_key: thumbKey, size: file.size });
+
+    setUploadStatus("Selesai! Video sudah tampil di situs.", 1);
+    mFile.value = "";
+    mTitle.value = "";
+    await refreshVideos(true);
+  } catch (err) {
+    setUploadStatus(err.message || "Upload gagal.", 0, true);
+  } finally {
+    mUploadBtn.disabled = false;
+    mFile.disabled = false;
+  }
+}
+
+async function addVideoByUrl() {
+  const url = mUrl.value.trim();
+  if (!/^https?:\/\//i.test(url)) {
+    alert("Link harus diawali http:// atau https://");
+    return;
+  }
+  const fallbackTitle = decodeURIComponent(url.split("?")[0].split("/").pop() || "").replace(/\.[^/.]+$/, "");
+  const title = mUrlTitle.value.trim() || fallbackTitle || "Video";
+
+  mUrlBtn.disabled = true;
+  mUrlBtn.textContent = "Menyimpan…";
+  try {
+    await adminVideosApi({ action: "add", title, video_url: url });
+    mUrl.value = "";
+    mUrlTitle.value = "";
+    await refreshVideos(true);
+  } catch (err) {
+    alert(`Gagal menambahkan video: ${err.message}`);
+  } finally {
+    mUrlBtn.disabled = false;
+    mUrlBtn.textContent = "Tambah";
+  }
+}
+
+async function deleteVideo(video, btn) {
+  if (!confirm(`Hapus "${video.name}" dari situs? Kalau video ini di-upload lewat dashboard, filenya di R2 ikut terhapus. Tindakan ini tidak bisa dibatalkan.`)) return;
+  btn.disabled = true;
+  btn.textContent = "Menghapus…";
+  try {
+    await adminVideosApi({ action: "delete", id: video.id });
+    await refreshVideos(true);
+  } catch (err) {
+    alert(`Gagal menghapus: ${err.message}`);
+    btn.disabled = false;
+    btn.textContent = "Hapus";
+  }
+}
+
+function renderManageList() {
+  mEmpty.classList.toggle("hidden", videoListCache.length > 0);
+  mList.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  videoListCache.forEach((v) => {
+    const li = document.createElement("li");
+
+    const thumb = document.createElement("img");
+    thumb.className = "m-thumb";
+    thumb.alt = "";
+    thumb.loading = "lazy";
+    if (v.thumbnailLink) thumb.src = v.thumbnailLink;
+
+    const info = document.createElement("div");
+    info.className = "m-info";
+    const title = document.createElement("div");
+    title.className = "m-title";
+    title.textContent = v.name;
+    const url = document.createElement("div");
+    url.className = "m-url";
+    url.textContent = v.url;
+    info.append(title, url);
+
+    const del = document.createElement("button");
+    del.className = "m-delete";
+    del.type = "button";
+    del.textContent = "Hapus";
+    del.addEventListener("click", () => deleteVideo(v, del));
+
+    li.append(thumb, info, del);
+    fragment.appendChild(li);
+  });
+  mList.appendChild(fragment);
+}
+
+async function syncFromR2() {
+  mSyncBtn.disabled = true;
+  mSyncBtn.textContent = "Menyinkronkan…";
+  try {
+    const r = await adminVideosApi({ action: "sync" });
+    mSyncStatus.textContent = `Selesai: ${r.added} video baru ditambahkan, ${r.removed} entri dibersihkan (file sudah tidak ada di R2).` +
+      (r.complete ? "" : " Peringatan: isi bucket tidak terbaca seluruhnya, pembersihan dilewati.");
+    await refreshVideos(true);
+  } catch (err) {
+    mSyncStatus.textContent = `Gagal menyinkronkan: ${err.message}`;
+  } finally {
+    mSyncBtn.disabled = false;
+    mSyncBtn.textContent = "Sinkronkan dari R2";
+  }
+}
+
+mSyncBtn.addEventListener("click", syncFromR2);
+mUploadBtn.addEventListener("click", uploadVideo);
+mUrlBtn.addEventListener("click", addVideoByUrl);
 
 function showDashboard(password) {
   loginScreen.classList.add("hidden");

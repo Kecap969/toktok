@@ -48,19 +48,18 @@ async function fetchVideoList() {
   return data.files || [];
 }
 
-function videoSrc(fileId) {
-  // Langsung ke Google Drive supaya streaming file besar & Range request
-  // (seek) ditangani server Google, bukan Edge Function.
-  return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(GOOGLE_DRIVE_API_KEY)}`;
+function videoSrc(file) {
+  // URL publik Cloudflare R2 (disimpan admin di tabel "videos"). Langsung
+  // dari R2 supaya streaming & Range request (seek) ditangani Cloudflare.
+  return file.url;
 }
 
 function thumbnailUrl(link) {
-  if (!link) return "";
-  return link.replace(/=s\d+$/, "=s320");
+  return link || "";
 }
 
 function prettifyCaption(rawName) {
-  let base = (rawName || "").replace(/\.[^/.]+$/, "");
+  let base = (rawName || "").replace(/\.(mp4|mov|m4v|webm|mkv|avi|3gp)$/i, "");
   base = base.replace(/^(VID|IMG|MOV|MP4|REC)[-_]?/i, "");
 
   let dateLabel = "";
@@ -130,14 +129,13 @@ function hidePlayerError() {
 // penyebabnya dengan request kecil (cuma 1 byte lewat header Range) ke URL
 // yang sama persis, lalu baca status HTTP dari situ.
 async function diagnosePlaybackError(src) {
-  // Google tidak izinkan browser membaca kode HTTP asli (403/404/dst) lewat
-  // fetch() untuk domain ini (dibatasi CORS di sisi Google, bukan kode kita).
-  // Jadi dipakai kode singkat sendiri: E1 = request sampai ke server Google
-  // tapi ditolak/gagal (biasanya kuota/izin Drive), E2 = request gagal
-  // terkirim sama sekali (jaringan/DNS/diblokir sebelum sampai ke Google).
+  // Dengan mode no-cors, browser tidak membocorkan kode HTTP asli, jadi
+  // dipakai kode singkat sendiri: E1 = server R2 terjangkau tapi video
+  // gagal diputar (file sudah dihapus / format tidak didukung browser),
+  // E2 = request gagal terkirim sama sekali (jaringan/DNS/diblokir).
   try {
     await fetch(src, { method: "HEAD", mode: "no-cors" });
-    return "Video gagal diputar (E1: kuota/izin Drive). Coba lagi.";
+    return "Video gagal diputar (E1: file tidak ditemukan atau formatnya tidak didukung). Coba lagi.";
   } catch {
     return "Video gagal diputar (E2: jaringan). Coba lagi.";
   }
@@ -162,7 +160,7 @@ if (playerErrorRetryBtn) {
     if (!currentFile) return;
     hidePlayerError();
     showPlayerLoading();
-    playerEl.src = videoSrc(currentFile.id);
+    playerEl.src = videoSrc(currentFile);
     playerEl.load();
     playerEl.play().catch(() => {});
   });
@@ -328,7 +326,7 @@ async function sendHeartbeat() {
         video_name: prettifyCaption(currentFile.name),
         current_time_sec: playerEl.currentTime,
         duration_sec: playerEl.duration,
-        thumbnail_url: currentFile.thumbnailLink ? thumbnailUrl(currentFile.thumbnailLink) : null,
+        thumbnail_url: currentFile.thumbnailLink || null,
       }),
     });
   } catch {
@@ -370,7 +368,7 @@ function playVideo(file, itemEl) {
 
   hidePlayerError();
   currentFile = file;
-  playerEl.src = videoSrc(file.id);
+  playerEl.src = videoSrc(file);
   playerTitleEl.textContent = prettifyCaption(file.name);
   playerEl.play().catch(() => {
     // Kalau browser menolak autoplay, tombol play besar tetap terlihat
@@ -406,16 +404,16 @@ function buildListItem(file) {
     thumb.addEventListener("load", () => {
       spinner.classList.add("hidden");
     });
-    // ...atau diganti keterangan error kalau gagal (link mati, folder Drive
-    // belum di-share publik, dll).
+    // ...atau diganti keterangan error kalau gagal (link mati, file
+    // thumbnail sudah dihapus dari R2, dll).
     thumb.addEventListener("error", () => {
       spinner.classList.add("hidden");
       thumb.classList.add("hidden");
       errorEl.classList.remove("hidden");
     });
   } else {
-    // Tidak ada thumbnailLink sama sekali dari Google Drive -- bukan error,
-    // cuma memang tidak ada pratinjaunya.
+    // Video ini tidak punya thumbnail (mis. ditambahkan lewat link URL) --
+    // bukan error, cuma memang tidak ada pratinjaunya.
     spinner.classList.add("hidden");
     thumb.classList.add("no-thumb");
   }
@@ -432,10 +430,6 @@ function buildListItem(file) {
 async function init() {
   if (!SUPABASE_FUNCTIONS_URL || SUPABASE_FUNCTIONS_URL.includes("TEMPEL")) {
     showStatus("error", "SUPABASE_FUNCTIONS_URL belum diisi di config.js.");
-    return;
-  }
-  if (!GOOGLE_DRIVE_API_KEY || GOOGLE_DRIVE_API_KEY.includes("TEMPEL")) {
-    showStatus("error", "GOOGLE_DRIVE_API_KEY belum diisi di config.js (dipakai untuk streaming video langsung dari Drive).");
     return;
   }
 
@@ -458,7 +452,7 @@ async function init() {
     const firstLi = listEl.firstElementChild;
     firstLi.classList.add("active");
     currentFile = firstFile;
-    playerEl.src = videoSrc(firstFile.id);
+    playerEl.src = videoSrc(firstFile);
     playerTitleEl.textContent = prettifyCaption(firstFile.name);
   } catch (err) {
     showStatus("error", err.message);
