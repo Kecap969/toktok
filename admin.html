@@ -712,7 +712,7 @@ input:focus-visible {
       <section class="m-card">
         <h2>Sinkronkan dari bucket R2</h2>
         <button class="m-btn" id="m-sync-btn" type="button">Sinkronkan dari R2</button>
-        <p class="m-hint" id="m-sync-status">Membaca isi bucket lewat S3 API: video yang ada di R2 tapi belum tampil di situs ditambahkan otomatis (judul dari nama file, tanpa thumbnail). Entri yang filenya sudah tidak ada di R2 ikut dibersihkan dari daftar.</p>
+        <p class="m-hint" id="m-sync-status">Membaca isi bucket lewat S3 API: video yang ada di R2 tapi belum tampil di situs ditambahkan otomatis (judul dari nama file), lalu thumbnail-nya dibuat dari detik pertama video. Entri yang filenya sudah tidak ada di R2 ikut dibersihkan. Biarkan halaman ini terbuka sampai selesai.</p>
       </section>
 
       <section class="m-card">
@@ -1202,12 +1202,14 @@ function putToR2(url, blob, contentType, onProgress) {
   });
 }
 
-// Ambil satu frame dari file video lokal (di browser admin) jadi JPEG kecil.
-// Mengembalikan null kalau gagal -- thumbnail itu opsional, upload tetap lanjut.
-function captureThumbnail(file) {
+// Ambil satu frame dari sebuah video (file lokal ATAU URL R2) jadi JPEG kecil.
+// Mengembalikan null kalau gagal -- thumbnail itu opsional. Untuk URL R2,
+// canvas hanya boleh dibaca kalau bucket R2 mengizinkan CORS GET dari
+// situs ini (lihat pengaturan CORS bucket).
+function captureFrame(src, { cors, revoke }) {
   return new Promise((resolve) => {
-    const objectUrl = URL.createObjectURL(file);
     const v = document.createElement("video");
+    if (cors) v.crossOrigin = "anonymous";
     v.muted = true;
     v.playsInline = true;
     v.preload = "metadata";
@@ -1217,12 +1219,12 @@ function captureThumbnail(file) {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
-      URL.revokeObjectURL(objectUrl);
+      if (revoke) URL.revokeObjectURL(src);
       v.removeAttribute("src");
       v.load();
       resolve(blob);
     };
-    const timer = setTimeout(() => finish(null), 10000);
+    const timer = setTimeout(() => finish(null), 20000);
 
     v.addEventListener("error", () => finish(null));
     v.addEventListener("loadedmetadata", () => {
@@ -1241,8 +1243,12 @@ function captureThumbnail(file) {
         finish(null);
       }
     });
-    v.src = objectUrl;
+    v.src = src;
   });
+}
+
+function captureThumbnail(file) {
+  return captureFrame(URL.createObjectURL(file), { cors: false, revoke: true });
 }
 
 function setUploadStatus(text, pct, isError) {
@@ -1387,13 +1393,50 @@ function renderManageList() {
   mList.appendChild(fragment);
 }
 
+// Buat thumbnail untuk semua video yang belum punya: browser admin membuka
+// video dari R2, mengambil satu frame, meng-upload JPG-nya ke R2, lalu server
+// memasangnya ke baris video (action "set_thumb"). Butuh CORS GET dari situs
+// ini di bucket R2.
+async function backfillThumbnails(onProgress) {
+  const todo = videoListCache.filter((v) => !v.thumbnailLink);
+  let ok = 0;
+  let fail = 0;
+  for (let i = 0; i < todo.length; i++) {
+    const v = todo[i];
+    if (onProgress) onProgress(i + 1, todo.length);
+    try {
+      const blob = await captureFrame(v.url, { cors: true, revoke: false });
+      if (!blob) throw new Error("frame gagal diambil");
+      const t = await adminVideosApi({ action: "presign", kind: "thumb", content_type: "image/jpeg" });
+      await putToR2(t.upload_url, blob, "image/jpeg");
+      await adminVideosApi({ action: "set_thumb", id: v.id, thumb_key: t.key });
+      ok++;
+    } catch {
+      fail++;
+    }
+  }
+  return { ok, fail, total: todo.length };
+}
+
 async function syncFromR2() {
   mSyncBtn.disabled = true;
   mSyncBtn.textContent = "Menyinkronkan…";
   try {
     const r = await adminVideosApi({ action: "sync" });
-    mSyncStatus.textContent = `Selesai: ${r.added} video baru ditambahkan, ${r.removed} entri dibersihkan (file sudah tidak ada di R2).` +
+    let summary = `${r.added} video baru ditambahkan, ${r.removed} entri dibersihkan (file sudah tidak ada di R2).` +
       (r.complete ? "" : " Peringatan: isi bucket tidak terbaca seluruhnya, pembersihan dilewati.");
+    mSyncStatus.textContent = summary;
+    await refreshVideos(true);
+
+    mSyncBtn.textContent = "Membuat thumbnail…";
+    const t = await backfillThumbnails((n, total) => {
+      mSyncStatus.textContent = `${summary} Membuat thumbnail ${n} dari ${total}…`;
+    });
+    if (t.total > 0) {
+      summary += ` ${t.ok} thumbnail dibuat` +
+        (t.fail ? `, ${t.fail} gagal (cek CORS GET bucket R2 untuk ${location.origin}, atau format video tidak didukung browser).` : ".");
+    }
+    mSyncStatus.textContent = `Selesai: ${summary}`;
     await refreshVideos(true);
   } catch (err) {
     mSyncStatus.textContent = `Gagal menyinkronkan: ${err.message}`;
