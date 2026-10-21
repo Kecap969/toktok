@@ -71,10 +71,11 @@ function prettifyCaption(rawName) {
   }
 
   base = base.replace(/[_-]+/g, " ").trim();
+  const original = base;
   if (/^\d+$/.test(base)) base = "";
 
   if (base && dateLabel) return `${base} — ${dateLabel}`;
-  return base || dateLabel || "Video";
+  return base || dateLabel || original || "Video";
 }
 
 function formatTime(seconds) {
@@ -94,7 +95,8 @@ function updatePlayPauseIcon() {
   const playing = !playerEl.paused && !playerEl.ended;
   iconPlay.classList.toggle("hidden", playing);
   iconPause.classList.toggle("hidden", !playing);
-  bigPlayBtn.classList.toggle("hidden", playing);
+  const errorShown = playerErrorEl && !playerErrorEl.classList.contains("hidden");
+  bigPlayBtn.classList.toggle("hidden", playing || errorShown);
 }
 
 function togglePlayPause() {
@@ -117,10 +119,12 @@ function showPlayerError(message) {
   hidePlayerLoading();
   if (playerErrorTextEl) playerErrorTextEl.textContent = message;
   if (playerErrorEl) playerErrorEl.classList.remove("hidden");
+  updatePlayPauseIcon();
 }
 
 function hidePlayerError() {
   if (playerErrorEl) playerErrorEl.classList.add("hidden");
+  updatePlayPauseIcon();
 }
 
 // Elemen <video> sendiri tidak memberi tahu kode status HTTP saat gagal
