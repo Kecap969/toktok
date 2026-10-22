@@ -2,9 +2,15 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="description" content="Indokep — nonton koleksi video langsung dari browser, tanpa aplikasi tambahan." />
 <meta name="theme-color" content="#121014" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Indokep" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
 <title>Indokep</title>
 <link rel="icon" href="indokep.png" />
 
@@ -27,11 +33,43 @@
 <header id="topbar">
   <img id="logo" src="indokep.png" alt="Indokep" />
   <span id="brand-name">INDOKEP</span>
+  <button id="install-btn" class="hidden" type="button">Pasang</button>
 </header>
 
 <main id="app">
 
-  <div id="player-wrap">
+  <section id="list-section">
+    <h2 class="list-heading">Daftar video <span id="video-count"></span></h2>
+    <ul id="video-list"></ul>
+  </section>
+
+  <div id="loading" class="status">
+    <div class="spinner"></div>
+    <p>Memuat daftar video…</p>
+  </div>
+
+  <div id="empty" class="status hidden">
+    <h2>Belum ada video</h2>
+    <p>Admin belum meng-upload video apa pun.</p>
+  </div>
+
+  <div id="error" class="status hidden">
+    <h2>Gagal memuat daftar video</h2>
+    <p id="error-detail">Terjadi kesalahan.</p>
+    <p>Periksa <code>SUPABASE_FUNCTIONS_URL</code> di <code>config.js</code> dan pastikan Edge Function <code>video-list</code> sudah di-deploy.</p>
+  </div>
+
+</main>
+
+<!-- Fullview pemutar: muncul menutupi seluruh layar saat card video diklik,
+     ditutup lewat tombol X (atau Esc / tombol Back di HP). Lihat app.js. -->
+<div id="player-wrap" class="hidden" role="dialog" aria-modal="true" aria-label="Pemutar video">
+  <div id="player-top">
+    <h1 id="player-title"></h1>
+    <button id="player-close" type="button" aria-label="Tutup video">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
+    </button>
+  </div>
     <div id="player-stage">
       <video id="player" playsinline preload="none" disablePictureInPicture controlsList="nodownload noremoteplayback"></video>
       <div id="player-loading" class="hidden"></div>
@@ -70,34 +108,7 @@
         </button>
       </div>
     </div>
-
-    <div id="player-info">
-      <h1 id="player-title">Pilih video di bawah untuk mulai memutar</h1>
-    </div>
-  </div>
-
-  <section id="list-section">
-    <h2 class="list-heading">Daftar video <span id="video-count"></span></h2>
-    <ul id="video-list"></ul>
-  </section>
-
-  <div id="loading" class="status">
-    <div class="spinner"></div>
-    <p>Memuat daftar video…</p>
-  </div>
-
-  <div id="empty" class="status hidden">
-    <h2>Belum ada video</h2>
-    <p>Admin belum meng-upload video apa pun.</p>
-  </div>
-
-  <div id="error" class="status hidden">
-    <h2>Gagal memuat daftar video</h2>
-    <p id="error-detail">Terjadi kesalahan.</p>
-    <p>Periksa <code>SUPABASE_FUNCTIONS_URL</code> di <code>config.js</code> dan pastikan Edge Function <code>video-list</code> sudah di-deploy.</p>
-  </div>
-
-</main>
+</div>
 
 <!-- Overlay ini SENGAJA di luar #main dan pakai position:fixed (lihat
      style.css) supaya menutupi seluruh halaman begitu internet mati, tapi

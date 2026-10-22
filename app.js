@@ -25,6 +25,8 @@ const playerLoadingEl = document.getElementById("player-loading");
 const playerErrorEl = document.getElementById("player-error");
 const playerErrorTextEl = document.getElementById("player-error-text");
 const playerErrorRetryBtn = document.getElementById("player-error-retry");
+const playerWrap = document.getElementById("player-wrap");
+const playerCloseBtn = document.getElementById("player-close");
 
 function showStatus(which, detail) {
   loadingEl.classList.add("hidden");
@@ -185,8 +187,48 @@ playerEl.addEventListener("play", updatePlayPauseIcon);
 playerEl.addEventListener("pause", updatePlayPauseIcon);
 playerEl.addEventListener("ended", updatePlayPauseIcon);
 
-// klik di badan video (bukan tombol) juga toggle play/pause
-playerEl.addEventListener("click", togglePlayPause);
+// ---------- Tampilan kontrol di fullview ----------
+// Kontrol + tombol X tampil saat video di-pause, lalu hilang sendiri setelah
+// 3 detik tanpa sentuhan selama video jalan. Di layar sentuh, ketukan
+// pertama saat kontrol tersembunyi hanya memunculkan kontrol (tidak
+// langsung play/pause), ketukan berikutnya baru play/pause.
+let uiHideTimer = null;
+
+function showUi() {
+  playerWrap.classList.remove("ui-hidden");
+  clearTimeout(uiHideTimer);
+  if (!playerEl.paused && !playerEl.ended) uiHideTimer = setTimeout(hideUi, 3000);
+}
+
+function hideUi() {
+  if (playerEl.paused || playerEl.ended) return;
+  if (isSeeking) {
+    uiHideTimer = setTimeout(hideUi, 1500);
+    return;
+  }
+  const errorShown = playerErrorEl && !playerErrorEl.classList.contains("hidden");
+  if (errorShown) return;
+  playerWrap.classList.add("ui-hidden");
+}
+
+playerEl.addEventListener("click", () => {
+  if (playerWrap.classList.contains("ui-hidden")) {
+    showUi();
+    return;
+  }
+  togglePlayPause();
+  showUi();
+});
+
+playerEl.addEventListener("play", showUi);
+playerEl.addEventListener("pause", showUi);
+playerEl.addEventListener("ended", showUi);
+playerWrap.addEventListener("pointermove", (e) => {
+  if (e.pointerType === "mouse") showUi();
+});
+playerWrap.addEventListener("pointerdown", () => {
+  if (!playerWrap.classList.contains("ui-hidden")) showUi();
+});
 
 playerEl.addEventListener("loadedmetadata", () => {
   timeDurationEl.textContent = formatTime(playerEl.duration);
@@ -228,9 +270,13 @@ fullscreenBtn.addEventListener("click", () => {
   if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => {});
   } else {
-    playerStage.requestFullscreen().catch(() => {});
+    playerWrap.requestFullscreen().catch(() => {});
   }
 });
+
+// Fullview sudah memenuhi layar; tombol layar-penuh browser hanya
+// ditampilkan kalau browser-nya mendukung (iPhone tidak).
+if (!document.fullscreenEnabled) fullscreenBtn.classList.add("hidden");
 
 document.addEventListener("fullscreenchange", () => {
   const isFs = !!document.fullscreenElement;
@@ -366,20 +412,72 @@ window.addEventListener("pagehide", stopHeartbeat);
 
 // ---------- Daftar video ----------
 
+let playerOpen = false;
+let lastOpenerEl = null;
+
+// Kalau halaman di-refresh saat fullview terbuka, state history-nya ikut
+// terbawa -- bersihkan supaya tombol X tidak salah memanggil history.back().
+if (history.state && history.state.fullview) history.replaceState(null, "");
+
+function openPlayer(openerEl) {
+  lastOpenerEl = openerEl;
+  playerOpen = true;
+  playerWrap.classList.remove("hidden", "ui-hidden");
+  document.body.classList.add("no-scroll");
+  // Satu entri history untuk fullview, supaya tombol Back di HP menutup
+  // fullview (bukan keluar dari halaman).
+  history.pushState({ fullview: true }, "");
+  playerCloseBtn.focus({ preventScroll: true });
+}
+
+function hidePlayer() {
+  if (!playerOpen) return;
+  playerOpen = false;
+  clearTimeout(uiHideTimer);
+  playerEl.pause();
+  // Tutup = pengunjung tidak lagi "sedang menonton": heartbeat berhenti,
+  // jadi di admin entry-nya hilang begitu masa kedaluwarsanya lewat.
+  stopHeartbeat();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  playerWrap.classList.add("hidden");
+  document.body.classList.remove("no-scroll");
+  document.querySelectorAll("#video-list li.active").forEach((li) => li.classList.remove("active"));
+  if (lastOpenerEl) lastOpenerEl.focus({ preventScroll: true });
+}
+
+function requestClosePlayer() {
+  if (history.state && history.state.fullview) history.back();
+  else hidePlayer();
+}
+
+playerCloseBtn.addEventListener("click", requestClosePlayer);
+window.addEventListener("popstate", hidePlayer);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && playerOpen && !document.fullscreenElement) requestClosePlayer();
+});
+
 function playVideo(file, itemEl) {
+  // Buka kembali video yang sama (belum diganti) -> lanjut dari posisi
+  // terakhir, bukan muat ulang dari awal.
+  const sameVideo = currentFile && currentFile.id === file.id && playerEl.getAttribute("src") && !playerEl.error;
+
   document.querySelectorAll("#video-list li.active").forEach((li) => li.classList.remove("active"));
   itemEl.classList.add("active");
 
   hidePlayerError();
   currentFile = file;
-  playerEl.src = videoSrc(file);
   playerTitleEl.textContent = prettifyCaption(file.name);
+  if (!sameVideo) {
+    playerEl.src = videoSrc(file);
+  } else if (playerEl.ended) {
+    playerEl.currentTime = 0;
+  }
+
+  openPlayer(itemEl);
   playerEl.play().catch(() => {
     // Kalau browser menolak autoplay, tombol play besar tetap terlihat
     // untuk user tap manual.
   });
-
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function buildListItem(file) {
@@ -462,15 +560,6 @@ async function init() {
     listEl.appendChild(fragment);
     const countEl = document.getElementById("video-count");
     if (countEl) countEl.textContent = files.length;
-
-    // Muat video pertama ke player (tanpa autoplay) supaya pengguna
-    // langsung lihat sesuatu di area player.
-    const firstFile = files[0];
-    const firstLi = listEl.firstElementChild;
-    firstLi.classList.add("active");
-    currentFile = firstFile;
-    playerEl.src = videoSrc(firstFile);
-    playerTitleEl.textContent = prettifyCaption(firstFile.name);
   } catch (err) {
     showStatus("error", err.message);
   }
@@ -531,3 +620,30 @@ window.addEventListener("online", hideOfflineOverlay);
 // Cek begitu skrip ini pertama jalan, siapa tahu halaman dibuka dalam
 // keadaan sudah offline dari awal.
 if (!navigator.onLine) showOfflineOverlay();
+
+
+// ---------- PWA: service worker + tombol "Pasang" ----------
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+
+const installBtn = document.getElementById("install-btn");
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBtn.classList.remove("hidden");
+});
+
+installBtn.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice.catch(() => {});
+  deferredInstallPrompt = null;
+  installBtn.classList.add("hidden");
+});
+
+window.addEventListener("appinstalled", () => installBtn.classList.add("hidden"));
