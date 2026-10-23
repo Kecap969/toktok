@@ -372,6 +372,103 @@ html, body {
   color: var(--muted);
 }
 
+/* ---------- Riwayat Tontonan ---------- */
+
+#watch-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+#watch-summary {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#clear-watch-btn {
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+#clear-watch-btn:hover { background: var(--accent-wash); }
+#clear-watch-btn:disabled { opacity: 0.5; cursor: default; background: transparent; }
+
+#watch-empty {
+  padding: 70px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+#watch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#watch-list > li {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+}
+
+.watch-user {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.watch-videos {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.watch-videos li {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.watch-videos li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.watch-video-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watch-video-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Navbar bawah (menu halaman) ---------- */
 
 #tabs {
@@ -854,6 +951,17 @@ input:focus-visible {
       <ul id="history-list"></ul>
     </div>
 
+    <div id="watch-view" class="hidden">
+      <div id="watch-toolbar">
+        <span id="watch-summary"></span>
+        <button id="clear-watch-btn" type="button">Bersihkan Semua</button>
+      </div>
+      <div id="watch-empty" class="hidden">
+        <p>Belum ada riwayat tontonan.</p>
+      </div>
+      <ul id="watch-list"></ul>
+    </div>
+
     <div id="manage-view" class="hidden">
       <section class="m-card">
         <h2>Sinkronkan dari bucket R2</h2>
@@ -889,6 +997,7 @@ input:focus-visible {
   <nav id="tabs" aria-label="Menu admin">
     <button class="tab-btn active" id="tab-live" type="button"><span class="tab-ico-wrap"><svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span class="tab-count" id="tab-live-count">0</span></span><span>Sedang Ditonton</span></button>
     <button class="tab-btn" id="tab-history" type="button"><span class="tab-ico-wrap"><svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span>Riwayat Masuk/Keluar</span></button>
+    <button class="tab-btn" id="tab-watch" type="button"><span class="tab-ico-wrap"><svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H4z"/><path d="M9.5 8.5v4l3.5-2z"/><path d="M8 20h8M12 16v4"/></svg></span><span>Riwayat Tontonan</span></button>
     <button class="tab-btn" id="tab-manage" type="button"><span class="tab-ico-wrap"><svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.5v5l4.5-2.5z"/></svg><span class="tab-count" id="tab-manage-count">0</span></span><span>Kelola Video</span></button>
   </nav>
 </div>
@@ -911,6 +1020,13 @@ const historyList = document.getElementById("history-list");
 const historyEmpty = document.getElementById("history-empty");
 
 const clearHistoryBtn = document.getElementById("clear-history-btn");
+
+const tabWatch = document.getElementById("tab-watch");
+const watchView = document.getElementById("watch-view");
+const watchList = document.getElementById("watch-list");
+const watchEmpty = document.getElementById("watch-empty");
+const watchSummary = document.getElementById("watch-summary");
+const clearWatchBtn = document.getElementById("clear-watch-btn");
 
 const tabManage = document.getElementById("tab-manage");
 const tabLiveCount = document.getElementById("tab-live-count");
@@ -936,6 +1052,7 @@ const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
 const PASSWORD_STORAGE_KEY = "admin:password";
 let pollTimer = null;
 let lastHistory = [];
+let lastWatch = [];
 let currentPassword = null;
 
 // Peta id video -> {id, name, url, thumbnailLink}, diambil dari video-list
@@ -1020,7 +1137,7 @@ async function fetchSessions(password) {
   if (!res.ok) {
     throw new Error(data?.error || `HTTP ${res.status}`);
   }
-  return { sessions: data.sessions || [], history: data.history || [] };
+  return { sessions: data.sessions || [], history: data.history || [], watch: data.watch_history || [] };
 }
 
 function formatDateTime(isoString) {
@@ -1117,20 +1234,121 @@ function renderHistory(history) {
   historyList.appendChild(fragment);
 }
 
+// Durasi tonton dalam bentuk ringkas: "1j 05m", "12m 30d", "45d".
+function formatWatched(seconds) {
+  const t = Math.max(0, Math.round(Number(seconds) || 0));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const sec = t % 60;
+  if (h > 0) return `${h}j ${String(m).padStart(2, "0")}m`;
+  if (m > 0) return `${m}m ${String(sec).padStart(2, "0")}d`;
+  return `${sec}d`;
+}
+
+// Riwayat tontonan dikelompokkan per pengunjung (satu sesi browser): IP +
+// device di atas, lalu daftar video yang ditonton berikut durasinya.
+function renderWatch(rows) {
+  watchEmpty.classList.toggle("hidden", rows.length > 0);
+  watchList.innerHTML = "";
+  watchSummary.textContent = rows.length
+    ? `${new Set(rows.map((r) => r.session_id)).size} pengunjung · ${rows.length} tontonan`
+    : "";
+
+  const groups = new Map();
+  rows.forEach((r) => {
+    if (!groups.has(r.session_id)) groups.set(r.session_id, []);
+    groups.get(r.session_id).push(r);
+  });
+
+  const nowMs = Date.now();
+  const fragment = document.createDocumentFragment();
+  for (const items of groups.values()) {
+    const first = items[0]; // baris terbaru (sudah diurutkan dari server)
+    const li = document.createElement("li");
+
+    const user = document.createElement("div");
+    user.className = "watch-user";
+    const ip = document.createElement("span");
+    ip.className = "history-ip";
+    ip.textContent = first.ip_address || "IP tidak diketahui";
+    const live = nowMs - new Date(first.last_seen_at).getTime() < 15000;
+    const badge = document.createElement("span");
+    badge.className = `history-badge ${live ? "online" : "offline"}`;
+    badge.textContent = live ? "Menonton" : "Selesai";
+    user.append(ip, badge);
+
+    const device = document.createElement("div");
+    device.className = "history-device";
+    device.textContent = [first.device_type, first.os, first.browser].filter(Boolean).join(" · ") || "Device tidak diketahui";
+
+    const ul = document.createElement("ul");
+    ul.className = "watch-videos";
+    items.forEach((r) => {
+      const item = document.createElement("li");
+      const title = document.createElement("div");
+      title.className = "watch-video-title";
+      title.textContent = r.video_name || (videoMap.get(r.video_id) || {}).name || "Video (sudah dihapus)";
+      const meta = document.createElement("div");
+      meta.className = "watch-video-meta";
+      const dur = Number(r.duration_sec) || 0;
+      const pct = dur ? Math.min(100, Math.round(((Number(r.max_position_sec) || 0) / dur) * 100)) : null;
+      meta.textContent =
+        `${formatDateTime(r.started_at)} · ditonton ${formatWatched(r.watched_sec)}` +
+        (pct !== null ? ` · sampai ${pct}%` : "");
+      item.append(title, meta);
+      ul.append(item);
+    });
+
+    li.append(user, device, ul);
+    fragment.appendChild(li);
+  }
+  watchList.appendChild(fragment);
+}
+
+async function clearWatchHistory() {
+  if (!currentPassword) return;
+  if (!confirm("Hapus semua riwayat tontonan kecuali yang sedang ditonton sekarang? Tindakan ini tidak bisa dibatalkan.")) return;
+  clearWatchBtn.disabled = true;
+  clearWatchBtn.textContent = "Membersihkan…";
+  try {
+    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/admin-clear-history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": currentPassword },
+      body: JSON.stringify({ target: "watch" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    const { watch } = await fetchSessions(currentPassword);
+    lastWatch = watch;
+    renderWatch(watch);
+  } catch (err) {
+    alert(`Gagal membersihkan riwayat tontonan: ${err.message}`);
+  } finally {
+    clearWatchBtn.disabled = false;
+    clearWatchBtn.textContent = "Bersihkan Semua";
+  }
+}
+
+clearWatchBtn.addEventListener("click", clearWatchHistory);
+
 function setActiveTab(tab) {
   tabLive.classList.toggle("active", tab === "live");
   tabHistory.classList.toggle("active", tab === "history");
   tabManage.classList.toggle("active", tab === "manage");
+  tabWatch.classList.toggle("active", tab === "watch");
+  watchView.classList.toggle("hidden", tab !== "watch");
   liveView.classList.toggle("hidden", tab !== "live");
   historyView.classList.toggle("hidden", tab !== "history");
   manageView.classList.toggle("hidden", tab !== "manage");
   if (tab === "history") renderHistory(lastHistory);
+  if (tab === "watch") renderWatch(lastWatch);
   if (tab === "manage") refreshVideos(true);
 }
 
 tabLive.addEventListener("click", () => setActiveTab("live"));
 tabHistory.addEventListener("click", () => setActiveTab("history"));
 tabManage.addEventListener("click", () => setActiveTab("manage"));
+tabWatch.addEventListener("click", () => setActiveTab("watch"));
 
 // Map session_id -> elemen DOM yang sudah dibuat, supaya video preview yang
 // sedang autoplay TIDAK di-reset (dan tidak "loncat"/restart) tiap kali poll
@@ -1323,11 +1541,13 @@ function schedulePoll(password) {
 async function poll(password) {
   currentPassword = password;
   try {
-    const { sessions, history } = await fetchSessions(password);
+    const { sessions, history, watch } = await fetchSessions(password);
     if (sessions.some((x) => !videoMap.has(x.video_id))) await refreshVideos(false);
     renderSessions(sessions);
     lastHistory = history;
+    lastWatch = watch;
     if (!historyView.classList.contains("hidden")) renderHistory(history);
+    if (!watchView.classList.contains("hidden")) renderWatch(watch);
     schedulePoll(password);
   } catch (err) {
     // Password ternyata salah/expired di tengah jalan -> kembali ke login.
