@@ -320,6 +320,58 @@ html, body {
   opacity: 0.4;
 }
 
+.session-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.history-videos {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.history-videos > span {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.history-videos ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-videos li {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-videos .none {
+  color: var(--muted);
+}
+
 /* ---------- Navbar bawah (menu halaman) ---------- */
 
 #tabs {
@@ -1000,6 +1052,8 @@ function buildHistoryItem(h) {
   device.className = "history-device";
   device.textContent = [h.device_type, h.os, h.browser].filter(Boolean).join(" · ") || "Device tidak diketahui";
 
+  const watched = buildHistoryVideos(h);
+
   const times = document.createElement("div");
   times.className = "history-times";
 
@@ -1010,8 +1064,49 @@ function buildHistoryItem(h) {
   keluar.innerHTML = `<span>Keluar</span>${h.still_online ? "Masih di web" : formatDateTime(h.left_at || h.last_seen_at)}`;
 
   times.append(masuk, keluar);
-  li.append(top, device, times);
+  li.append(top, device);
+  if (watched) li.append(watched);
+  li.append(times);
   return li;
+}
+
+// Daftar video yang ditonton satu pengunjung. Server boleh mengirim salah satu:
+//   h.videos = [{video_id, video_name}, ...]  (atau array string nama)
+//   h.video_name / h.video_id                 (video terakhir)
+// Kalau server belum mengirim field video sama sekali, bagian ini tidak tampil.
+function historyVideoNames(h) {
+  const nameOf = (v) => {
+    if (typeof v === "string") return v;
+    return v.video_name || v.name || (videoMap.get(v.video_id) || {}).name || "Video (sudah dihapus)";
+  };
+  if (Array.isArray(h.videos)) return h.videos.map(nameOf);
+  if (h.video_name || h.video_id) return [nameOf(h)];
+  if ("video_name" in h || "video_id" in h || "videos" in h) return [];
+  return null;
+}
+
+function buildHistoryVideos(h) {
+  const names = historyVideoNames(h);
+  if (names === null) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "history-videos";
+  const label = document.createElement("span");
+  label.textContent = "Video ditonton";
+  const list = document.createElement("ul");
+  if (names.length === 0) {
+    const li = document.createElement("li");
+    li.className = "none";
+    li.textContent = "Belum memutar video";
+    list.append(li);
+  } else {
+    names.forEach((n) => {
+      const li = document.createElement("li");
+      li.textContent = n;
+      list.append(li);
+    });
+  }
+  wrap.append(label, list);
+  return wrap;
 }
 
 function renderHistory(history) {
@@ -1074,7 +1169,13 @@ function buildSessionCard(s) {
   name.className = "session-video-name";
   const updated = document.createElement("span");
   updated.className = "session-updated";
-  header.append(name, updated);
+  const title = document.createElement("div");
+  title.className = "session-title";
+  const label = document.createElement("span");
+  label.className = "session-label";
+  label.textContent = "Sedang menonton";
+  title.append(label, name);
+  header.append(title, updated);
 
   const track = document.createElement("div");
   track.className = "session-progress-track";
