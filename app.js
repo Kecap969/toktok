@@ -40,14 +40,30 @@ function showStatus(which, detail) {
   }
 }
 
-async function fetchVideoList() {
-  const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/video-list`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = data?.error || `HTTP ${res.status}`;
-    throw new Error(msg);
+async function fetchVideoList(attempt = 1) {
+  // Timeout 12 detik + sampai 3x percobaan: di sinyal lemah, satu request
+  // yang menggantung tidak lagi membuat halaman macet di "Memuat…".
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/video-list`, { signal: ctrl.signal });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data?.error || `HTTP ${res.status}`);
+      err.retryable = res.status >= 500;
+      throw err;
+    }
+    return data.files || [];
+  } catch (e) {
+    const retryable = e.retryable !== false;
+    if (retryable && attempt < 3) {
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+      return fetchVideoList(attempt + 1);
+    }
+    throw e.name === "AbortError" ? new Error("Koneksi lambat, daftar video tidak termuat.") : e;
+  } finally {
+    clearTimeout(timer);
   }
-  return data.files || [];
 }
 
 function videoSrc(file) {
@@ -129,46 +145,103 @@ function hidePlayerError() {
   updatePlayPauseIcon();
 }
 
-// Elemen <video> sendiri tidak memberi tahu kode status HTTP saat gagal
-// (cuma kode error generik seperti "network" atau "decode"). Supaya pesan
-// ke pengguna bisa lebih spesifik, begitu <video> gagal kita coba tebak
-// penyebabnya dengan request kecil (cuma 1 byte lewat header Range) ke URL
-// yang sama persis, lalu baca status HTTP dari situ.
+// ---------- Error pemutaran: diagnosa + sambung ulang otomatis ----------
+// Elemen <video> tidak memberi tahu kode HTTP saat gagal. Jadi begitu gagal,
+// kita minta 1 byte (header Range) dari URL yang sama untuk membaca statusnya.
+// Kalau CORS bucket R2 belum mengizinkan situs ini, status tidak terbaca dan
+// dipakai pemeriksaan no-cors sebagai cadangan.
+//   temporary = true -> gangguan sementara (sibuk / jaringan): dicoba ulang
+//   otomatis sampai 3x. Kalau tetap gagal, baru tampil tombol "Coba Lagi".
 async function diagnosePlaybackError(src) {
-  // Dengan mode no-cors, browser tidak membocorkan kode HTTP asli, jadi
-  // dipakai kode singkat sendiri: E1 = server R2 terjangkau tapi video
-  // gagal diputar (file sudah dihapus / format tidak didukung browser),
-  // E2 = request gagal terkirim sama sekali (jaringan/DNS/diblokir).
   try {
-    await fetch(src, { method: "HEAD", mode: "no-cors" });
-    return "Video gagal diputar (E1: file tidak ditemukan atau formatnya tidak didukung). Coba lagi.";
+    const res = await fetch(src, { headers: { Range: "bytes=0-0" } });
+    if (res.status === 429 || res.status >= 500) {
+      return { temporary: true, message: `Server video sedang sibuk (kode ${res.status}). Coba lagi sebentar lagi.` };
+    }
+    if (res.status === 403 || res.status === 404) {
+      return { temporary: false, message: `Video tidak ditemukan atau akses ditolak (kode ${res.status}).` };
+    }
+    return { temporary: false, message: "Video gagal diputar (E1: format video mungkin tidak didukung perangkat ini)." };
   } catch {
-    return "Video gagal diputar (E2: jaringan). Coba lagi.";
+    try {
+      await fetch(src, { method: "HEAD", mode: "no-cors" });
+      return { temporary: false, message: "Video gagal diputar (E1: file tidak ditemukan atau formatnya tidak didukung). Coba lagi." };
+    } catch {
+      return { temporary: true, message: "Video gagal diputar (E2: jaringan). Coba lagi." };
+    }
   }
 }
 
+let retryCount = 0;
+let stallTimer = null;
+
+// Muat ulang sumber video lalu lanjut dari posisi terakhir (bukan dari awal).
+function reloadCurrent(resumeAt) {
+  if (!currentFile) return;
+  const t = Number(resumeAt) || 0;
+  playerEl.src = videoSrc(currentFile);
+  playerEl.load();
+  if (t > 0) {
+    playerEl.addEventListener("loadedmetadata", () => {
+      try { playerEl.currentTime = t; } catch {}
+    }, { once: true });
+  }
+  playerEl.play().catch(() => {});
+}
+
+function scheduleAutoRetry(resumeAt) {
+  retryCount++;
+  setTimeout(showPlayerLoading, 0);
+  setTimeout(() => reloadCurrent(resumeAt), 1200 * retryCount);
+}
+
 playerEl.addEventListener("error", async () => {
-  // Kode error "ABORTED" muncul WAJAR setiap kali src video diganti (misal
-  // pengguna pindah video lain, atau tombol "Coba Lagi" reload) -- browser
-  // otomatis membatalkan pemuatan yang lama. Itu bukan kegagalan sungguhan,
-  // jadi jangan ditampilkan sebagai error ke pengguna.
+  // ABORTED muncul wajar setiap src diganti; bukan kegagalan sungguhan.
   if (playerEl.error && playerEl.error.code === MediaError.MEDIA_ERR_ABORTED) return;
   const src = playerEl.currentSrc || playerEl.src;
   if (!src) return;
-  const message = await diagnosePlaybackError(src);
-  showPlayerError(message);
+  const resumeAt = playerEl.currentTime || 0;
+
+  // Koneksi putus di tengah streaming: langsung sambung ulang.
+  if (playerEl.error && playerEl.error.code === MediaError.MEDIA_ERR_NETWORK && retryCount < 3 && navigator.onLine) {
+    scheduleAutoRetry(resumeAt);
+    return;
+  }
+
+  const diag = await diagnosePlaybackError(src);
+  if (diag.temporary && retryCount < 3 && navigator.onLine) {
+    scheduleAutoRetry(resumeAt);
+    return;
+  }
+  showPlayerError(diag.message);
 });
 
-playerEl.addEventListener("playing", hidePlayerError);
+playerEl.addEventListener("playing", () => {
+  retryCount = 0;
+  hidePlayerError();
+});
+
+// Buffering macet lebih dari 15 detik (sinyal lemah): sambung ulang dari
+// posisi yang sama, maksimal 3x berturut-turut.
+playerEl.addEventListener("waiting", () => {
+  clearTimeout(stallTimer);
+  stallTimer = setTimeout(() => {
+    if (playerEl.paused || playerEl.readyState >= 3 || retryCount >= 3 || !navigator.onLine) return;
+    scheduleAutoRetry(playerEl.currentTime || 0);
+  }, 15000);
+});
+["playing", "pause", "canplay", "error", "emptied"].forEach((ev) =>
+  playerEl.addEventListener(ev, () => clearTimeout(stallTimer))
+);
 
 if (playerErrorRetryBtn) {
   playerErrorRetryBtn.addEventListener("click", () => {
     if (!currentFile) return;
+    const resumeAt = playerEl.currentTime || 0;
+    retryCount = 0;
     hidePlayerError();
     showPlayerLoading();
-    playerEl.src = videoSrc(currentFile);
-    playerEl.load();
-    playerEl.play().catch(() => {});
+    reloadCurrent(resumeAt);
   });
 }
 
@@ -579,6 +652,10 @@ let wasPlayingBeforeOffline = false;
 
 function showOfflineOverlay() {
   if (!offlineOverlay) return;
+  // Sudah tampil: jangan timpa status "tadi sedang memutar" (video sudah di-pause
+  // oleh panggilan pertama, jadi nilainya akan salah jadi false dan video tidak
+  // lanjut otomatis saat online lagi).
+  if (!offlineOverlay.classList.contains("hidden")) return;
   offlineOverlay.classList.remove("hidden");
   // Jeda video sementara offline -- daripada dibiarkan buffering sia-sia
   // (dan browser nampilin error) sampai koneksi balik. Status "sedang main
